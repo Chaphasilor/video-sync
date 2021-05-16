@@ -1,0 +1,42 @@
+{
+  "name": "video-sync",
+  "version": "1.0.0",
+  "author": "Chaphasilor",
+  "bin": {
+    "video-sync": "./bin/run"
+  },
+  "bugs": "https://github.com/Chaphasilor/video-sync/issues",
+  "dependencies": {
+    "@oclif/command": "^1.8.0",
+    "@oclif/config": "^1.17.0",
+    "@oclif/plugin-help": "^3.2.2"
+  },
+  "devDependencies": {
+    "@oclif/dev-cli": "^1.26.0",
+    "eslint": "^5.16.0",
+    "eslint-config-oclif": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=8.0.0"
+  },
+  "files": [
+    "/bin",
+    "/src"
+  ],
+  "homepage": "https://github.com/Chaphasilor/video-sync",
+  "keywords": [
+    "oclif"
+  ],
+  "license": "GPL-3.0",
+  "main": "src/index.js",
+  "oclif": {
+    "bin": "video-sync"
+  },
+  "repository": "Chaphasilor/video-sync",
+  "scripts": {
+    "posttest": "eslint .",
+    "prepack": "oclif-dev readme",
+    "test": "echo NO TESTS",
+    "version": "oclif-dev readme && git add README.md"
+  }
+}
