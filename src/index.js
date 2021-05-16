@@ -39,7 +39,9 @@ class VideoSyncCommand extends Command {
       searchResolution: flags.searchResolution,
     }).then((offset) => {
       // cli.action.stop()
-      merge(offset)
+      merge(args.video1, args.video2, offset)
+      .then(() => console.info(`Done!`))
+      .catch(err => console.warn(err))
     })
     
   }

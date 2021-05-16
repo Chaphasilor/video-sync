@@ -1,13 +1,12 @@
 const { exec } = require(`child_process`)
 const probe = require(`node-ffprobe`)
 
-module.exports = function(offset) {
+module.exports = function(video1, video2, offset) {
   return new Promise((resolve, reject) => {
   
     let detectedTracks = []
 
-    let identifier = exec(`mkvmerge ${[`"/mnt/c/Users/Chaphasilor/Videos/3.mp4"`, `-i`].join(` `)}`)
-    // let identifier = exec(`mkvmerge ${[`"/mnt/c/Users/Chaphasilor/Videos/His Dark Materials  - 1x06.mp4"`, `-i`].join(` `)}`)
+    let identifier = exec(`mkvmerge "${video2}" -i`)
     identifier.stdout.setEncoding(`utf8`)
     identifier.stderr.setEncoding(`utf8`)
 
@@ -46,15 +45,12 @@ module.exports = function(offset) {
 
       if (detectedTracks.length > 0) {
 
-        let vidData = await probe("/mnt/c/Users/Chaphasilor/Videos/3.mp4")
-        offset = Number(offset) + Number(vidData.streams[1].start_time)*1000
+        let vidData = await probe(video2)
+        offset = Number(offset) + Number(vidData.streams[1].start_time)*1000 //TODO compensate for video offset
         console.info(`Final offset is ${offset} ms`)
 
-        console.log(`mkvmerge ${[`-o "/mnt/c/Users/Chaphasilor/Videos/out.mkv"`, `"/mnt/c/Users/Chaphasilor/Videos/WandaVision - 1x03.mp4"`,  `-D`, `-a ${detectedTracks[1].id}`, `--sync ${detectedTracks[1].id}:${offset}`, `"/mnt/c/Users/Chaphasilor/Videos/3.mp4"`].join(` `)}`)
-        let merger = exec(`mkvmerge ${[`-o "/mnt/c/Users/Chaphasilor/Videos/out.mkv"`, `"/mnt/c/Users/Chaphasilor/Videos/WandaVision - 1x03.mp4"`,  `-D`, `-a ${detectedTracks[1].id}`, `--sync ${detectedTracks[1].id}:${offset}`, `"/mnt/c/Users/Chaphasilor/Videos/3.mp4"`].join(` `)}`)
-
-        // console.log(`mkvmerge ${[`-o out.mkv`, `"/mnt/c/Users/Chaphasilor/Videos/His Dark Materials  - 1x06.mp4"`,  `-D`, `-a ${detectedTracks[1].id}`, `--sync ${detectedTracks[1].id}:${offset}`, `"/mnt/c/Users/Chaphasilor/Videos/His Dark Materials - 1x06 (german).mkv"`].join(` `)}`)
-        // let merger = exec(`mkvmerge ${[`-o out.mkv`, `"/mnt/c/Users/Chaphasilor/Videos/His Dark Materials  - 1x06.mp4"`,  `-D`, `-a ${detectedTracks[1].id}`, `--sync ${detectedTracks[1].id}:${offset}`, `"/mnt/c/Users/Chaphasilor/Videos/His Dark Materials - 1x06 (german).mkv"`].join(` `)}`)
+        console.log(`mkvmerge ${[`-o "out.mkv"`, `"${video1}"`,  `-D`, `-a ${detectedTracks[1].id}`, `--sync ${detectedTracks[1].id}:${offset}`, `"${video2}"`].join(` `)}`)
+        let merger = exec(`mkvmerge ${[`-o "out.mkv"`, `"${video1}"`,  `-D`, `-a ${detectedTracks[1].id}`, `--sync ${detectedTracks[1].id}:${offset}`, `"${video2}"`].join(` `)}`)
 
         merger.stdout.setEncoding(`utf8`)
         merger.stderr.setEncoding(`utf8`)
@@ -70,11 +66,13 @@ module.exports = function(offset) {
         merger.on('close', (code, signal) => {
 
           if (!code) {
-            new Error(`mkvmerge was killed by '${signal}'`);
+            return reject(new Error(`mkvmerge was killed by '${signal}'`));
           }
           if (code !== 1) {
-            new Error(`mkvmerge exited with code '${code}'`);
+            return reject(new Error(`mkvmerge exited with code '${code}'`));
           }
+
+          return resolve()
 
         })
         

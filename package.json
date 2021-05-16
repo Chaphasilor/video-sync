@@ -9,7 +9,14 @@
   "dependencies": {
     "@oclif/command": "^1.8.0",
     "@oclif/config": "^1.17.0",
-    "@oclif/plugin-help": "^3.2.2"
+    "@oclif/plugin-help": "^3.2.2",
+    "better-logging": "^4.5.0",
+    "bmp-js": "^0.1.0",
+    "node-ffprobe": "^3.0.0",
+    "pixelmatch": "^5.2.1",
+    "pngjs": "^6.0.0",
+    "resize-img": "^2.0.0",
+    "ssim.js": "^3.5.0"
   },
   "devDependencies": {
     "@oclif/dev-cli": "^1.26.0",
