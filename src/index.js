@@ -2,7 +2,7 @@ const fs = require(`fs`)
 
 const betterLogging = require(`better-logging`)
 betterLogging(console, {
-  format: process.env.environment !== `production` ? undefined : ctx => `${ctx.STAMP(new Date().toISOString().slice(0, 19).replace(`T`, `_`))} ${ctx.type} ${ctx.msg}`,
+  format: ctx => `${ctx.type} ${ctx.msg}`,
   messageConstructionStrategy: betterLogging.MessageConstructionStrategy.FIRST,
 })
 
@@ -100,6 +100,9 @@ class VideoSyncCommand extends Command {
         type: `input`,
         message: `Specify the output file (where the synced and muxed video gets written to)`,
         name: `output`,
+        validate: (input) => {
+          return input.length > 0 || `You need to specify a name!`
+        }
       },
     ])
   
@@ -184,24 +187,24 @@ Extra documentation goes here
 
 VideoSyncCommand.args = [
   {
-    name: `video1`,               // name of arg to show in help and reference with args[name]
-    required: false,            // make the arg required with `required: true`
-    description: `video to be synced *with*`, // help description
+    name: `destination`,
+    required: false,
+    description: `video to be synced *with*`,
   },
   {
-    name: `offset1`,               // name of arg to show in help and reference with args[name]
-    required: false,            // make the arg required with `required: true`
-    description: `frame offset for the first video`, // help description
+    name: `destinationOffset`,
+    required: false,
+    description: `frame offset for the first video`,
   },
   {
-    name: `video2`,               // name of arg to show in help and reference with args[name]
-    required: false,            // make the arg required with `required: true`
-    description: `video to be synced`, // help description
+    name: `source`,
+    required: false,
+    description: `video to be synced`,
   },
   {
-    name: `offset2`,               // name of arg to show in help and reference with args[name]
-    required: false,            // make the arg required with `required: true`
-    description: `frame offset for the second video`, // help description
+    name: `sourceOffset`,
+    required: false,
+    description: `frame offset for the second video`,
   },
 ]
 
@@ -210,23 +213,23 @@ VideoSyncCommand.flags = {
   help: flags.help({char: `h`}), // add --help flag to show CLI version
   algorithm: flags.enum({
     char: `a`,
-    description: `matching algorithm to use`,
+    description: `matching algorithm to use for video syncing`,
     options: [`ssim`, `matching-pixels`],
     default: `ssim`,
   }),
   iterations: flags.integer({
     char: `i`,
-    description: `number of iterations to perform`,
+    description: `number of iterations to perform for video syncing`,
     default: 2,
   }),
   searchWidth: flags.integer({
     char: `w`,
-    description: `width of the search region (in seconds). the program will find the closest matching frame in this region, OFFSET2 being the center`,
+    description: `width of the search region (in seconds) for video syncing. the program will find the closest matching frame in this region, 'sourceOffset' being the center`,
     default: 10,
   }),
   searchResolution: flags.integer({
     char: `r`,
-    description: `resolution of the search region (in frames). increases accuracy at the cost of longer runtime`,
+    description: `resolution of the search region (in frames) for video syncing. increases accuracy at the cost of longer runtime`,
     default: 40,
   }),
   verbose: flags.boolean({

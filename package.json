@@ -14,7 +14,9 @@
     "bmp-js": "^0.1.0",
     "cli-ux": "^5.5.1",
     "inquirer": "^8.0.0",
+    "inquirer-fs-selector": "^1.2.0",
     "ms": "^2.1.3",
+    "node-exec-promise": "^1.0.2",
     "node-ffprobe": "^3.0.0",
     "ora": "^5.4.0",
     "pixelmatch": "^5.2.1",
@@ -34,6 +36,13 @@
     "/bin",
     "/src"
   ],
+  "pkg": {
+    "scripts": [
+      "./src/**/*.js",
+      "./util/**/*.js"
+    ],
+    "outputPath": "dist"
+  },
   "homepage": "https://github.com/Chaphasilor/video-sync",
   "keywords": [
     "oclif"

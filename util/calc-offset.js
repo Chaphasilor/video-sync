@@ -1,5 +1,5 @@
 const os = require(`os`)
-const fs = require(`fs`)
+const fs = require(`fs/promises`)
 const probe = require(`node-ffprobe`)
 const resizeImg = require(`resize-img`)
 const cli = require(`cli-ux`).default
@@ -26,10 +26,11 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
 
   // cli.action.start(`Syncing the videos`)
   //TODO Not spinning continuously :(
+    //FIXME swap synchronous fs operations with asynchronous ones
   const spinner = ora(`Syncing the videos...`).start();
 
-  let staticFrameDir = fs.mkdtempSync(`${os.tmpdir()}/static`)
-  let rollingFramesDir = fs.mkdtempSync(`${os.tmpdir()}/frames`)
+  let staticFrameDir = await fs.mkdtemp(`${os.tmpdir()}/static`)
+  let rollingFramesDir = await fs.mkdtemp(`${os.tmpdir()}/frames`)
   console.log(`staticFrameDir:`, staticFrameDir)
   console.log(`rollingFramesDir:`, rollingFramesDir)
 
@@ -42,15 +43,15 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
   const staticFrameOffset = parseInt(video1IsLarger ? offset1 : offset2)
   const rollingFrameOffset = parseInt(video1IsLarger ? offset2 : offset1)
 
-  let staticFrame = extractFrames({
+  let staticFrame = (await extractFrames({
     input: staticFrameInput,
     outputDir: staticFrameDir,
     offsets: [staticFrameOffset],
-  })[0]
+  }))[0]
   const staticFramePath = `${staticFrameDir}/${staticFrame.filename}`
   
   //TODO blackbar detection and removal
-  fs.writeFileSync(staticFramePath, await resizeImg(fs.readFileSync(staticFramePath), {
+  await fs.writeFile(staticFramePath, await resizeImg(await fs.readFile(staticFramePath), {
     format: `bmp`,
     width: videoDimensions[1].width,
     height: videoDimensions[1].height,
@@ -73,9 +74,7 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
     const gen = offsetGenerator(parseInt((searchCenter - searchWidth*1000/2)), searchWidth*1000 / searchResolution)
     let offsets = new Array(searchResolution).fill(0).map(x => gen.next().value)
 
-    console.log(`offsets:`, offsets)
-    
-    let exportedFrames = extractFrames({
+    let exportedFrames = await extractFrames({
       input: rollingFrameInput,
       outputDir: rollingFramesDir,
       offsets,
@@ -84,7 +83,6 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
     console.debug(`exportedFrames:`, exportedFrames)
     
     closestMatch = await findClosestFrame(staticFramePath, rollingFramesDir, options.algorithm)
-    console.log(`Done.`)
 
     console.debug(`closestMatch:`, closestMatch)
 

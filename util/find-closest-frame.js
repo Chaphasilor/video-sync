@@ -1,4 +1,4 @@
-const fs = require('fs')
+const fs = require('fs/promises')
 const PNG = require('pngjs').PNG
 const bmp = require(`bmp-js`)
 const pixelmatch = require('pixelmatch')
@@ -13,16 +13,16 @@ module.exports.ALGORITHMS = ALGORITHMS
 
 module.exports.findClosestFrame = async function findClosestFrame(inputFile, frameInputDir, selectedAlg = ALGORITHMS.SSIM) {
 
-  const inputImage = bmp.decode(fs.readFileSync(inputFile))
+  const inputImage = bmp.decode(await fs.readFile(inputFile))
   const { width, height } = inputImage
 
   console.log(`Looking for closest matching frame...`)
   console.log(`Using algorithm '${selectedAlg}'`)
 
-  const files = fs.readdirSync(frameInputDir, {
+  const files = (await fs.readdir(frameInputDir, {
     withFileTypes: true
-  }).filter(x => x.isFile())
-  
+  })).filter(x => x.isFile())
+
   let closestMatch = {
     filename: undefined,
     value: selectedAlg === ALGORITHMS.SSIM ? -1 : Infinity,
@@ -30,11 +30,11 @@ module.exports.findClosestFrame = async function findClosestFrame(inputFile, fra
   
   for (const file of files) {
   
-    let imageToCompare = bmp.decode(fs.readFileSync(`${frameInputDir}/${file.name}`));
+    let imageToCompare = bmp.decode(await fs.readFile(`${frameInputDir}/${file.name}`));
     
     if (imageToCompare.width !== width || imageToCompare.height !== height) {
       console.log(`resizing...`)
-      imageToCompare = bmp.decode(await resizeImg(fs.readFileSync(`${frameInputDir}/${file.name}`), {
+      imageToCompare = bmp.decode(await resizeImg(await fs.readFile(`${frameInputDir}/${file.name}`), {
         format: `bmp`,
         width,
         height,
@@ -55,7 +55,6 @@ module.exports.findClosestFrame = async function findClosestFrame(inputFile, fra
       (selectedAlg === ALGORITHMS.MISMATCHED_PIXELS && result < closestMatch.value)
       ) {
         
-
       switch (selectedAlg) {
         case ALGORITHMS.SSIM:
           result = ssim(inputImage, imageToCompare);
@@ -82,6 +81,11 @@ module.exports.findClosestFrame = async function findClosestFrame(inputFile, fra
           throw new Error(`Invalid algorithm!`)
           break;
       }
+
+    }
+
+    if (closestMatch.value === 1) {
+      break
     }
   
   }
