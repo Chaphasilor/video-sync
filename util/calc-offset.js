@@ -2,6 +2,8 @@ const os = require(`os`)
 const fs = require(`fs`)
 const probe = require(`node-ffprobe`)
 const resizeImg = require(`resize-img`)
+const cli = require(`cli-ux`).default
+const ora = require('ora');
 
 const extractFrames = require(`./extract-frames`)
 const { ALGORITHMS, findClosestFrame } = require(`./find-closest-frame`)
@@ -21,6 +23,10 @@ module.exports.ALGORITHMS = ALGORITHMS
 module.exports.calcOffset = async function(video1Path, video2Path, offset1, offset2, options = {
   algorithm: ALGORITHMS.SSIM,
 }) {
+
+  // cli.action.start(`Syncing the videos`)
+  //TODO Not spinning continuously :(
+  const spinner = ora(`Syncing the videos...`).start();
 
   let staticFrameDir = fs.mkdtempSync(`${os.tmpdir()}/static`)
   let rollingFramesDir = fs.mkdtempSync(`${os.tmpdir()}/frames`)
@@ -43,6 +49,7 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
   })[0]
   const staticFramePath = `${staticFrameDir}/${staticFrame.filename}`
   
+  //TODO blackbar detection and removal
   fs.writeFileSync(staticFramePath, await resizeImg(fs.readFileSync(staticFramePath), {
     format: `bmp`,
     width: videoDimensions[1].width,
@@ -91,9 +98,15 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
   console.log(`searchCenter:`, searchCenter)
   
   let totalOffset = (staticFrameOffset - searchCenter).toFixed(0)
-  console.info(`Video 2 is approx. ${Math.abs(totalOffset)} ms ${video1IsLarger && totalOffset > 0 ? `ahead` : `behind`} video 1 (${closestMatch.value})`)
+  console.log(`Video 2 is approx. ${Math.abs(totalOffset)} ms ${video1IsLarger && totalOffset > 0 ? `ahead` : `behind`} video 1 (${closestMatch.value})`)
 
-  return totalOffset
+  // cli.action.stop(`Done! Source video is approx. ${Math.abs(totalOffset)} ms ${video1IsLarger && totalOffset > 0 ? `ahead` : `behind`} destination video (confidence ${closestMatch.value.toFixed(5)}).`)
+  spinner.succeed(`Source video is approx. ${Math.abs(totalOffset)} ms ${video1IsLarger && totalOffset > 0 ? `ahead` : `behind`} destination video (confidence ${closestMatch.value.toFixed(5)}).`)
+  
+  return {
+    videoOffset: totalOffset,
+    confidence: closestMatch.value.toFixed(5),
+  }
 
 }
 
@@ -103,6 +116,7 @@ async function getVideoDimensions(vid1, vid2) {
   console.log(`vid2:`, vid2)
   let vid1Data = await probe(vid1)
   let vid2Data = await probe(vid2)
+  console.log(`vid2:`, vid2)
 
   console.log(`Video 1: width: ${vid1Data.streams[0].width}, height: ${vid1Data.streams[0].height}`)
   console.log(`Video 2: width: ${vid2Data.streams[0].width}, height: ${vid2Data.streams[0].height}`)

@@ -1,85 +1,95 @@
 const { exec } = require(`child_process`)
 const probe = require(`node-ffprobe`)
+const cli = require(`cli-ux`).default
+const ora = require('ora');
+const chalk = require('chalk');
+const tracks = require(`./tracks`)
 
-module.exports = function(video1, video2, offset) {
-  return new Promise((resolve, reject) => {
+module.exports = function(video1, video2, output, offset, tracksToSync) {
+  return new Promise(async (resolve, reject) => {
   
-    let detectedTracks = []
+    let spinner = ora(`Figuring out offsets for audio tracks...`).start();
+    // cli.action.start(`Figuring out offsets for audio tracks`)
+    
+    let matchedTracks
+    try {
+      matchedTracks = await tracks.matchTracksAndStreams(video2)
+    } catch (err) {
+      throw new Error(err)
+    }
+    
+    let vidData = await probe(video2)
+    let finalOffsets = [...tracksToSync.audio, ...tracksToSync.subs].map(trackId => {
+      let foundTrack =  matchedTracks.find(track => track.ids.mkvmerge === trackId)
+      let streamIndex = foundTrack.ids.ffprobe
+      return {
+        id: trackId,
+        offset: Number(offset) + Number(vidData.streams.find(stream => stream.index === streamIndex).start_time)*1000 //TODO compensate for video offset
+      }
+    })
 
-    let identifier = exec(`mkvmerge "${video2}" -i`)
-    identifier.stdout.setEncoding(`utf8`)
-    identifier.stderr.setEncoding(`utf8`)
+    spinner.succeed(`Final offsets calculated.`)
+    console.log(`Final offsets are:`, finalOffsets)
 
-    identifier.stdout.on('data', (data) => {
+    let trackIdsAudioString = tracksToSync.audio.length > 0 ? tracksToSync.audio.reduce((sum, cur, index) => {
+      return `${sum}${index > 0 ? `,` : ``}${cur}`
+    }, `-a `) : ``
+    let trackIdsSubsString = tracksToSync.subs.length > 0 ? tracksToSync.subs.reduce((sum, cur, index) => {
+      return `${sum}${index > 0 ? `,` : ``}${cur}`
+    }, `-s `) : ``
+    let syncString = finalOffsets.reduce((sum, cur) => {
+      return `${sum} --sync ${cur.id}:${cur.offset}`
+    }, ``)
 
-      let extractor = /Track ID (\d): ([a-zA-Z]+) \((.*)\)/
-      data.split(`\n`).forEach(line => {
-        console.log(`line:`, line)
-        if (extractor.test(line)) {
-          let result = line.match(extractor)
-          detectedTracks.push({
-            id: result[1],
-            type: result[2],
-            format: result[3],
-          })
-        } else {
-          console.log(`no match`)
-        }
-      })
+    // cli.action.start(`Muxing output video`)
+
+    let mergeCommand = `mkvmerge -o "${output}" "${video1}" -D ${trackIdsAudioString} ${trackIdsSubsString} ${syncString} "${video2}"`
+    console.log(mergeCommand)
+    let merger = exec(mergeCommand)
+
+    merger.stdout.setEncoding(`utf8`)
+    merger.stderr.setEncoding(`utf8`)
+
+    const simpleBar = cli.progress({
+      format: `Muxing output video [${chalk.green('{bar}')}] {percentage} % | ETA: {eta}s`,
+      etaBuffer: 7,
+    })
+    simpleBar.start(100, 0);
+
+    merger.stdout.on('data', (data) => {
       console.debug(`stdout: ${data}`);
+      let tester = /Progress: (\d+)%/
+      if (tester.test(data)) {
+        simpleBar.update(Number(data.match(tester)[1])); //TODO extract progress
+      }
     });
-    identifier.stderr.on('data', (data) => {
+    merger.stderr.on('data', (data) => {
       console.warn(`Error from mkvmerge: ${data}`);
     });
 
-    identifier.on('close', async (code, signal) => {
+    merger.on('close', (code, signal) => {
 
-      if (!code) {
-        new Error(`mkvmerge was killed by '${signal}'`);
+      simpleBar.stop()
+      
+      if (!code && code !== 0) {
+        return reject(new Error(`mkvmerge was killed by '${signal}'`));
       }
-      if (code !== 1) {
-        new Error(`mkvmerge exited with code '${code}'`);
+      if (code === 2) {
+        return reject(new Error(`Muxing FAILED! mkvmerge exited with code '${code}'`));
       }
 
-      console.log(`detectedTracks:`, detectedTracks)
-
-      if (detectedTracks.length > 0) {
-
-        let vidData = await probe(video2)
-        offset = Number(offset) + Number(vidData.streams[1].start_time)*1000 //TODO compensate for video offset
-        console.info(`Final offset is ${offset} ms`)
-
-        console.log(`mkvmerge ${[`-o "out.mkv"`, `"${video1}"`,  `-D`, `-a ${detectedTracks[1].id}`, `--sync ${detectedTracks[1].id}:${offset}`, `"${video2}"`].join(` `)}`)
-        let merger = exec(`mkvmerge ${[`-o "out.mkv"`, `"${video1}"`,  `-D`, `-a ${detectedTracks[1].id}`, `--sync ${detectedTracks[1].id}:${offset}`, `"${video2}"`].join(` `)}`)
-
-        merger.stdout.setEncoding(`utf8`)
-        merger.stderr.setEncoding(`utf8`)
-
-        merger.stdout.on('data', (data) => {
-
-          console.debug(`stdout: ${data}`);
-        });
-        merger.stderr.on('data', (data) => {
-          console.warn(`Error from mkvmerge: ${data}`);
-        });
-
-        merger.on('close', (code, signal) => {
-
-          if (!code) {
-            return reject(new Error(`mkvmerge was killed by '${signal}'`));
-          }
-          if (code !== 1) {
-            return reject(new Error(`mkvmerge exited with code '${code}'`));
-          }
-
-          return resolve()
-
-        })
-        
+      if (code === 1) {
+        // warnings were logged
+        console.warn(`Some warnings occurred during muxing. For more info, try again with the '-v' flag.`)
       }
+
+      const tempSpinner = ora(``).start();
+      tempSpinner.succeed(`Done.`)
+
+      return resolve()
 
     })
-  
+
   })
 }
 

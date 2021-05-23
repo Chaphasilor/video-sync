@@ -48,6 +48,8 @@ module.exports.findClosestFrame = async function findClosestFrame(inputFile, fra
       result = pixelmatch(inputImage.data, imageToCompare.data, null, width, height, {threshold: 0.1});
     }
   
+    //TODO if closestMatch.value doesn't change at all, somethings fishy (e.g. static scene)
+    // either try again with different offsets or prompt the user, but the former option would be more robust
     if (
       (selectedAlg === ALGORITHMS.SSIM && result.mssim > closestMatch.value) ||
       (selectedAlg === ALGORITHMS.MISMATCHED_PIXELS && result < closestMatch.value)

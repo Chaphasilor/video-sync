@@ -6,6 +6,8 @@
 /yarn.lock
 node_modules
 
+*.tar.gz
 *.bmp
 *.mp4
 *.mkv
+video-sync
