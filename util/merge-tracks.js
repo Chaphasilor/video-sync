@@ -17,9 +17,33 @@ module.exports = function(video1, video2, output, offset, tracksToSync) {
     } catch (err) {
       throw new Error(err)
     }
+
+    let trackIdsToSync = {
+      audio: tracksToSync.audio.map(track => {
+        if (track.type === `language`) {
+          return matchedTracks.filter(x => x.infos.type === `audio`).filter(x => (x.infos.language === track.value || x.infos.languageIetf === track.value)).map(x => x.ids.mkvmerge)
+        } else {
+          return track.value
+        }
+      }).flat(),
+      subs: tracksToSync.subs.map(track => {
+        if (track.type === `language`) {
+          return matchedTracks.filter(x => x.infos.type === `subs`).filter(x => (x.infos.language === track.value || x.infos.languageIetf === track.value)).map(x => x.ids.mkvmerge)
+        } else {
+          return track.value
+        }
+      }).flat(),
+    }
+
+    console.log(`trackIdsToSync:`, trackIdsToSync)
+    if (trackIdsToSync.audio.length + trackIdsToSync.subs.length === 0) {
+      // nothing to do
+      spinner.warn(`No tracks to sync!`)
+      return resolve();
+    }
     
     let vidData = await probe(video2)
-    let finalOffsets = [...tracksToSync.audio, ...tracksToSync.subs].map(trackId => {
+    let finalOffsets = [...trackIdsToSync.audio, ...trackIdsToSync.subs].map(trackId => {
       let foundTrack =  matchedTracks.find(track => track.ids.mkvmerge === trackId)
       let streamIndex = foundTrack.ids.ffprobe
       return {
@@ -31,10 +55,10 @@ module.exports = function(video1, video2, output, offset, tracksToSync) {
     spinner.succeed(`Final offsets calculated.`)
     console.log(`Final offsets are:`, finalOffsets)
 
-    let trackIdsAudioString = tracksToSync.audio.length > 0 ? tracksToSync.audio.reduce((sum, cur, index) => {
+    let trackIdsAudioString = trackIdsToSync.audio.length > 0 ? trackIdsToSync.audio.reduce((sum, cur, index) => {
       return `${sum}${index > 0 ? `,` : ``}${cur}`
     }, `-a `) : ``
-    let trackIdsSubsString = tracksToSync.subs.length > 0 ? tracksToSync.subs.reduce((sum, cur, index) => {
+    let trackIdsSubsString = trackIdsToSync.subs.length > 0 ? trackIdsToSync.subs.reduce((sum, cur, index) => {
       return `${sum}${index > 0 ? `,` : ``}${cur}`
     }, `-s `) : ``
     let syncString = finalOffsets.reduce((sum, cur) => {
@@ -60,7 +84,7 @@ module.exports = function(video1, video2, output, offset, tracksToSync) {
       console.debug(`stdout: ${data}`);
       let tester = /Progress: (\d+)%/
       if (tester.test(data)) {
-        simpleBar.update(Number(data.match(tester)[1])); //TODO extract progress
+        simpleBar.update(Number(data.match(tester)[1]));
       }
     });
     merger.stderr.on('data', (data) => {
@@ -70,7 +94,7 @@ module.exports = function(video1, video2, output, offset, tracksToSync) {
     merger.on('close', (code, signal) => {
 
       simpleBar.stop()
-      
+
       if (!code && code !== 0) {
         return reject(new Error(`mkvmerge was killed by '${signal}'`));
       }
@@ -78,7 +102,7 @@ module.exports = function(video1, video2, output, offset, tracksToSync) {
         return reject(new Error(`Muxing FAILED! mkvmerge exited with code '${code}'`));
       }
 
-      if (code === 1) {
+      if (code === 1 && console.logLevel < 4) {
         // warnings were logged
         console.warn(`Some warnings occurred during muxing. For more info, try again with the '-v' flag.`)
       }

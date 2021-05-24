@@ -186,6 +186,11 @@ function matchTracksAndStreams(video2) {
       
       console.log(`Track #${i} has stream index '${streamIndex}' and track id '${trackId}'`)
       matchings.push({
+        infos: {
+          type: getTrackType(trackInfo),
+          language: trackInfo.properties.language,
+          languageIetf: trackInfo.properties.language_ietf
+        },
         ids: {
           ffprobe: streamIndex,
           mkvmerge: trackId,
@@ -249,6 +254,19 @@ function getTrackInfo(video) {
 }
 module.exports.getTrackInfo = getTrackInfo
 
+function getTrackType(trackInfo) {
+  switch (trackInfo.type) {
+    case `audio`:
+      return `audio`
+      break;
+    case `subtitles`:
+      return `subs`
+      break;
+  
+    default:
+      break;
+  }
+}
 
 // matchTracksAndStreams(`/mnt/c/Users/Chaphasilor/Videos/BadBatchCopy.mkv`)
 // .then(tracks => console.info(`tracks:`, tracks))

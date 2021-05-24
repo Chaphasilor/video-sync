@@ -2,7 +2,6 @@ const os = require(`os`)
 const fs = require(`fs/promises`)
 const probe = require(`node-ffprobe`)
 const resizeImg = require(`resize-img`)
-const cli = require(`cli-ux`).default
 const ora = require('ora');
 
 const extractFrames = require(`./extract-frames`)
@@ -24,9 +23,6 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
   algorithm: ALGORITHMS.SSIM,
 }) {
 
-  // cli.action.start(`Syncing the videos`)
-  //TODO Not spinning continuously :(
-    //FIXME swap synchronous fs operations with asynchronous ones
   const spinner = ora(`Syncing the videos...`).start();
 
   let staticFrameDir = await fs.mkdtemp(`${os.tmpdir()}/static`)
@@ -57,6 +53,13 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
     height: videoDimensions[1].height,
   }))
 
+  // TODO automatic syncing without specifying offsets
+  // choose a random offset (padded at start and end)
+  // try syncing at that offset
+  // if the confidence stays the same for multiple frames => static scene => restart with different offset
+  // if the confidence is too low at the end => restart with different offset
+  // otherwise sync should work just fine
+  
   let searchCenter = rollingFrameOffset // in milliseconds
   let searchResolution = parseInt((options.searchResolution))
   let closestMatch
@@ -89,6 +92,10 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
     let closestOffset = exportedFrames.find(frame => frame.filename === closestMatch.filename)?.offset
     console.log(`closestOffset:`, closestOffset)
     searchCenter = closestOffset
+
+    if (closestMatch.value === 1) {
+      break
+    }
     
   }
 

@@ -9,6 +9,7 @@ betterLogging(console, {
 const {Command, flags} = require(`@oclif/command`)
 const inquirer = require(`inquirer`)
 const cli = require(`cli-ux`).default
+const ora = require('ora');
 const ms = require(`ms`)
 
 const { ALGORITHMS, calcOffset } = require(`../util/calc-offset`)
@@ -35,117 +36,208 @@ class VideoSyncCommand extends Command {
         break;
     }
     
-    let answers = await inquirer.prompt([
-      {
-        type: `input`,
-        message: `Enter the destination file (where you want the synced tracks to be added to)`,
-        name: `destination`,
-        validate: function (answer) {
-          if (!fs.existsSync(answer)) {
-            return `The path you provided doesn't exist. Please provide a valid path to a video file.`;
+    //TODO if some flags (e.g. `-o`) are set, don't prompt for them anymore
+    let prompt = Object.values(args).filter(x => x !== undefined).length !== 4
+    let answers
+
+    if (prompt) {
+
+      answers = await inquirer.prompt([
+        {
+          type: `input`,
+          message: `Enter the destination file (where you want the synced tracks to be added to)`,
+          name: `destination`,
+          validate: function (answer) {
+            if (!fs.existsSync(answer)) {
+              return `The path you provided doesn't exist. Please provide a valid path to a video file.`;
+            }
+            return true;
+          },
+        },
+        {
+          type: `input`,
+          message: `Enter the offset (in ms or with units) for the destination file (where to start looking for matching frames while synching)`,
+          name: `destinationOffset`,
+          validate: (formattedInput) => {
+            if (formattedInput === undefined) {
+              return `Didn't recognize that time string! Valid units: ms, s, m, h.`
+            } else if (formattedInput < 0) {
+              return `Only positive offsets are supported. '0' is the beginning of the video.`
+            } else {
+              return true
+            }
+          },
+          filter: (input) => {
+            let matches = input.match(/(\-\s*)\d/g)?.map(x => x.slice(0, -1)) || []
+            input = matches.reduce((sum, cur) => sum.replace(cur, `-`), input)
+            return input.split(` `).reduce((sum, cur) => sum + ms(cur), 0)
+          },
+        },
+        {
+          type: `input`,
+          message: `Enter the source file (that contains the new tracks to be synced over)`,
+          name: `source`,
+          validate: function (answer) {
+            if (!fs.existsSync(answer)) {
+              return `The path you provided doesn't exist. Please provide a valid path to a video file.`;
+            }
+            return true;
+          },
+        },
+        {
+          type: `input`,
+          message: `Enter the offset (in ms or with units) for the source file (where to start looking for matching frames while syncing)`,
+          name: `sourceOffset`,
+          validate: (formattedInput) => {
+            if (formattedInput === undefined || isNaN(formattedInput)) {
+              return `Didn't recognize that time string! Valid units: ms, s, m, h.`
+            } else if (formattedInput < 0) {
+              return `Only positive offsets are supported. '0' is the beginning of the video.`
+            } else {
+              return true
+            }
+          },
+          filter: (input) => {
+            let matches = input.match(/(\-\s*)\d/g)?.map(x => x.slice(0, -1)) || []
+            input = matches.reduce((sum, cur) => sum.replace(cur, `-`), input)
+            return input.split(` `).reduce((sum, cur) => sum + ms(cur), 0)
+          },
+        },
+        {
+          type: `input`,
+          message: `Specify the output file (where the synced and muxed video gets written to)`,
+          name: `output`,
+          validate: (input) => {
+            return input.length > 0 || `You need to specify a name!`
           }
-          return true;
         },
-      },
-      {
-        type: `input`,
-        message: `Enter the offset (in ms or with units) for the destination file (where to start looking for matching frames while synching)`,
-        name: `destinationOffset`,
-        validate: (formattedInput) => {
-          if (formattedInput === undefined) {
-            return `Didn't recognize that time string! Valid units: ms, s, m, h.`
-          } else if (formattedInput < 0) {
-            return `Only positive offsets are supported. '0' is the beginning of the video.`
-          } else {
-            return true
-          }
-        },
-        filter: (input) => {
-          let matches = input.match(/(\-\s*)\d/g)?.map(x => x.slice(0, -1)) || []
-          input = matches.reduce((sum, cur) => sum.replace(cur, `-`), input)
-          return input.split(` `).reduce((sum, cur) => sum + ms(cur), 0)
-        },
-      },
-      {
-        type: `input`,
-        message: `Enter the source file (that contains the new tracks to be synced over)`,
-        name: `source`,
-        validate: function (answer) {
-          if (!fs.existsSync(answer)) {
-            return `The path you provided doesn't exist. Please provide a valid path to a video file.`;
-          }
-          return true;
-        },
-      },
-      {
-        type: `input`,
-        message: `Enter the offset (in ms or with units) for the source file (where to start looking for matching frames while syncing)`,
-        name: `sourceOffset`,
-        validate: (formattedInput) => {
-          if (formattedInput === undefined || isNaN(formattedInput)) {
-            return `Didn't recognize that time string! Valid units: ms, s, m, h.`
-          } else if (formattedInput < 0) {
-            return `Only positive offsets are supported. '0' is the beginning of the video.`
-          } else {
-            return true
-          }
-        },
-        filter: (input) => {
-          let matches = input.match(/(\-\s*)\d/g)?.map(x => x.slice(0, -1)) || []
-          input = matches.reduce((sum, cur) => sum.replace(cur, `-`), input)
-          return input.split(` `).reduce((sum, cur) => sum + ms(cur), 0)
-        },
-      },
-      {
-        type: `input`,
-        message: `Specify the output file (where the synced and muxed video gets written to)`,
-        name: `output`,
-        validate: (input) => {
-          return input.length > 0 || `You need to specify a name!`
-        }
-      },
-    ])
-  
+      ])
+      
+    } else {
+
+      answers = {
+        destination: args.destination,
+        destinationOffset: args.destinationOffset,
+        source: args.source,
+        sourceOffset: args.sourceOffset,
+        output: flags.output,
+      }
+
+    }
+    
     let availableTracks = tracks.getTrackInfo(answers.source)
     
-    let selectedTracks = await inquirer.prompt([
-      {
-        type: `checkbox`,
-        message: `Which audio tracks do you want copied and synced?`,
-        name: `audio`,
-        when: availableTracks.audio.length > 0,
-        choices: availableTracks.audio.map(info => {
-          return {
-            name: `${info.name ? `"${info.name}"` : `*nameless*`} (${info.language}, ${info.codec}, ${info.channels} channel${info.channels.length > 1 ? `s`: ``}) - ID ${info.ids.mkvmerge}`,
-            value: info.ids.mkvmerge,
-            checked: false,
-            disabled: false,
-          }
-        }),
-        validate: function (answer) {
-          if (answer.length < 1) {
-            return `You must choose at least one track. Use <space> to toggle selection, <enter> to confirm.`;
-          }
-  
-          return true;
-        },
-      },
-      {
-        type: `checkbox`,
-        message: `Which subtitle tracks do you want copied and synced?`,
-        name: `subs`,
-        when: availableTracks.subs.length > 0,
-        choices: availableTracks.subs.map(info => {
-          return {
-            name: `${info.name ? `"${info.name}"` : `*nameless*`} (${info.language}, ${info.codec}) - ID ${info.ids.mkvmerge}`,
-            value: info.ids.mkvmerge,
-            checked: false,
-            disabled: false,
-          }
-        }),
-      },
-    ])
+    let selectedTracks
+    
+    if (prompt) {
 
+      selectedTracks = await inquirer.prompt([
+        {
+          type: `checkbox`,
+          message: `Which audio tracks do you want copied and synced?`,
+          name: `audio`,
+          when: availableTracks.audio.length > 0,
+          choices: availableTracks.audio.map(info => {
+            return {
+              name: `${info.name ? `"${info.name}"` : `*nameless*`} (${info.language}, ${info.codec}, ${info.channels} channel${info.channels.length > 1 ? `s`: ``}) - ID ${info.ids.mkvmerge}`,
+              value: {
+                type: `id`,
+                value: info.ids.mkvmerge
+              },
+              checked: false,
+              disabled: false,
+            }
+          }),
+        },
+        {
+          type: `checkbox`,
+          message: `Which subtitle tracks do you want copied and synced?`,
+          name: `subs`,
+          when: availableTracks.subs.length > 0,
+          choices: availableTracks.subs.map(info => {
+            return {
+              name: `${info.name ? `"${info.name}"` : `*nameless*`} (${info.language}, ${info.codec}) - ID ${info.ids.mkvmerge}`,
+              value: {
+                type: `id`,
+                value: info.ids.mkvmerge
+              },
+              checked: false,
+              disabled: false,
+            }
+          }),
+        },
+      ])
+
+    } else {
+
+      let audioSelectors = []
+      let subsSelectors = []
+      
+      if (flags.audioTracks) {
+        
+        let flatValuesAudio = flags.audioTracks?.flat()
+        audioSelectors = flatValuesAudio?.map(x => {
+  
+          let parsed = parseInt(x, 10) // make sure the value only contains 0-9
+          if (isNaN(parsed)) {
+            if (x.slice(0, 1) === `-`) {
+              // flag
+              throw new Error(`The audioTracks flag requires at least one value!`)
+            }
+            // language
+            return {
+              type: `language`,
+              value: x
+            }
+          } else {
+            // ID
+            return {
+              type: `id`,
+              value: parsed
+            }
+          }
+        })
+
+      }
+
+      console.debug(`audioSelectors:`, audioSelectors)
+
+      if (flags.subsTracks) {
+
+        let flatValuesSubs = flags.subsTracks.flat()
+        subsSelectors = flatValuesSubs.map(x => {
+  
+          let parsed = parseInt(x, 10) // make sure the value only contains 0-9
+          if (isNaN(parsed)) {
+            if (x.slice(0, 1) === `-`) {
+              // flag
+              throw new Error(`The subsTracks flag requires at least one value!`)
+            }
+            // language
+            return {
+              type: `language`,
+              value: x
+            }
+          } else {
+            // ID
+            return {
+              type: `id`,
+              value: parsed
+            }
+          }
+        })
+
+      }
+
+      console.debug(`subsSelectors:`, subsSelectors)
+
+      selectedTracks = {
+        audio: audioSelectors,
+        subs: subsSelectors,
+      }
+      
+    }
+    
     // inquirer doesn't include a property if it wasn't included due to `when`
     selectedTracks = {
       audio: selectedTracks.audio ?? [],
@@ -158,10 +250,13 @@ class VideoSyncCommand extends Command {
       searchWidth: flags.searchWidth,
       searchResolution: flags.searchResolution,
     })
+    // let videoOffset = 0, confidence = 1
 
-    let continueWithMerging = true
+    //TODO check if output already exists and prompt for confirm overwrite
+    
+    let continueWithMerging = answers.output !== undefined && (selectedTracks.audio.length > 0 || selectedTracks.subs.length > 0)
 
-    if (flags.algorithm === `ssim` && confidence < 0.5) {
+    if (!flags.confirm && flags.algorithm === `ssim` && confidence < 0.5) {
       continueWithMerging = (await inquirer.prompt([{
         type: `confirm`,
         name: `continue`,
@@ -175,6 +270,9 @@ class VideoSyncCommand extends Command {
       } catch (err) {
         console.error(err.message)
       }
+    } else {
+      const tempSpinner = ora(``).start();
+      tempSpinner.succeed(`Done.`)
     }
     
   }
@@ -189,30 +287,58 @@ VideoSyncCommand.args = [
   {
     name: `destination`,
     required: false,
-    description: `video to be synced *with*`,
+    description: `video where tracks should be added to`,
   },
   {
     name: `destinationOffset`,
     required: false,
-    description: `frame offset for the first video`,
+    description: `frame offset for the destination video`,
   },
   {
     name: `source`,
     required: false,
-    description: `video to be synced`,
+    description: `video where the tracks are copied from`,
   },
   {
     name: `sourceOffset`,
     required: false,
-    description: `frame offset for the second video`,
+    description: `frame offset for the source video`,
   },
 ]
 
 VideoSyncCommand.flags = {
   version: flags.version(), // add --version flag to show CLI version
   help: flags.help({char: `h`}), // add --help flag to show CLI version
-  algorithm: flags.enum({
+  output: flags.string({
+    char: `o`,
+    description: `output file path`,
+    required: false, // if omitted, only the offset is printed
+  }),
+  confirm: flags.boolean({
+    char: `y`,
+    description: `automatically confirm missing tracks, low confidence scores and overwrite prompts
+    `,
+    required: false, // if omitted, only the offset is printed
+    default: false,
+  }),
+  audioTracks: flags.string({
     char: `a`,
+    default: ``,
+    multiple: true, // important to allow spaces in-between
+    parse: x => x.split(`,`).map(y => y.trim()),
+    description: `audio tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced)`,
+    required: false, // if omitted, only the offset is printed
+  }),
+  subsTracks: flags.string({
+    char: `s`,
+    default: ``,
+    multiple: true, // important to allow spaces in-between
+    parse: x => x.split(`,`).map(y => y.trim()),
+    description: `subtitle tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced)`,
+    required: false, // if omitted, only the offset is printed
+  }),
+  algorithm: flags.enum({
+    char: `g`,
     description: `matching algorithm to use for video syncing`,
     options: [`ssim`, `matching-pixels`],
     default: `ssim`,
@@ -240,3 +366,7 @@ VideoSyncCommand.flags = {
 }
 
 module.exports = VideoSyncCommand
+
+function flatten(arr) {
+
+}
