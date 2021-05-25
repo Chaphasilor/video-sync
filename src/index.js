@@ -22,6 +22,9 @@ class VideoSyncCommand extends Command {
     const { args, flags } = this.parse(VideoSyncCommand)
 
     console.logLevel = flags.verbose ? 4 : 2
+
+    // console.warn(`args:`, args)
+    // console.warn(`flags:`, flags)
     
     let algorithm
     switch (flags.algorithm) {
@@ -36,7 +39,6 @@ class VideoSyncCommand extends Command {
         break;
     }
     
-    //TODO if some flags (e.g. `-o`) are set, don't prompt for them anymore
     let prompt = Object.values(args).filter(x => x !== undefined).length !== 4
     let answers
 
@@ -109,7 +111,8 @@ class VideoSyncCommand extends Command {
           name: `output`,
           validate: (input) => {
             return input.length > 0 || `You need to specify a name!`
-          }
+          },
+          when: flags.output === undefined
         },
       ])
       
@@ -136,7 +139,7 @@ class VideoSyncCommand extends Command {
           type: `checkbox`,
           message: `Which audio tracks do you want copied and synced?`,
           name: `audio`,
-          when: availableTracks.audio.length > 0,
+          when: availableTracks.audio.length > 0 && flags.audioTracks === undefined,
           choices: availableTracks.audio.map(info => {
             return {
               name: `${info.name ? `"${info.name}"` : `*nameless*`} (${info.language}, ${info.codec}, ${info.channels} channel${info.channels.length > 1 ? `s`: ``}) - ID ${info.ids.mkvmerge}`,
@@ -153,7 +156,7 @@ class VideoSyncCommand extends Command {
           type: `checkbox`,
           message: `Which subtitle tracks do you want copied and synced?`,
           name: `subs`,
-          when: availableTracks.subs.length > 0,
+          when: availableTracks.subs.length > 0 && flags.subsTracks === undefined,
           choices: availableTracks.subs.map(info => {
             return {
               name: `${info.name ? `"${info.name}"` : `*nameless*`} (${info.language}, ${info.codec}) - ID ${info.ids.mkvmerge}`,
@@ -170,9 +173,19 @@ class VideoSyncCommand extends Command {
 
     } else {
 
-      let audioSelectors = []
-      let subsSelectors = []
-      
+      let audioSelectors = availableTracks.audio.map(info => {
+        return {
+          type: `id`,
+          value: info.ids.mkvmerge,
+        }
+      })
+      let subsSelectors = availableTracks.subs.map(info => {
+        return {
+          type: `id`,
+          value: info.ids.mkvmerge,
+        }
+      })
+
       if (flags.audioTracks) {
         
         let flatValuesAudio = flags.audioTracks?.flat()
@@ -252,8 +265,6 @@ class VideoSyncCommand extends Command {
     })
     // let videoOffset = 0, confidence = 1
 
-    //TODO check if output already exists and prompt for confirm overwrite
-    
     let continueWithMerging = answers.output !== undefined && (selectedTracks.audio.length > 0 || selectedTracks.subs.length > 0)
 
     if (!flags.confirm && flags.algorithm === `ssim` && confidence < 0.5) {
@@ -272,7 +283,7 @@ class VideoSyncCommand extends Command {
       }
     } else {
       const tempSpinner = ora(``).start();
-      tempSpinner.succeed(`Done.`)
+      tempSpinner.info(`Nothing else to do.`)
     }
     
   }
@@ -323,18 +334,16 @@ VideoSyncCommand.flags = {
   }),
   audioTracks: flags.string({
     char: `a`,
-    default: ``,
     multiple: true, // important to allow spaces in-between
     parse: x => x.split(`,`).map(y => y.trim()),
-    description: `audio tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced)`,
+    description: `audio tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced). if omitted, all audio tracks will be synced.`,
     required: false, // if omitted, only the offset is printed
   }),
   subsTracks: flags.string({
     char: `s`,
-    default: ``,
     multiple: true, // important to allow spaces in-between
     parse: x => x.split(`,`).map(y => y.trim()),
-    description: `subtitle tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced)`,
+    description: `subtitle tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced). if omitted, all subtitle tracks will be synced`,
     required: false, // if omitted, only the offset is printed
   }),
   algorithm: flags.enum({

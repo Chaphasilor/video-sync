@@ -43,12 +43,13 @@ module.exports = function(video1, video2, output, offset, tracksToSync) {
     }
     
     let vidData = await probe(video2)
+    const videoOffset = Number(vidData.streams.find(stream => stream.codec_type === `video`)?.start_time || 0.0)*1000
     let finalOffsets = [...trackIdsToSync.audio, ...trackIdsToSync.subs].map(trackId => {
       let foundTrack =  matchedTracks.find(track => track.ids.mkvmerge === trackId)
       let streamIndex = foundTrack.ids.ffprobe
       return {
         id: trackId,
-        offset: Number(offset) + Number(vidData.streams.find(stream => stream.index === streamIndex).start_time)*1000 //TODO compensate for video offset
+        offset: Number(offset) + Number(vidData.streams.find(stream => stream.index === streamIndex).start_time)*1000 + videoOffset
       }
     })
 
