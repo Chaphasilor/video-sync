@@ -41,7 +41,12 @@
       "./src/**/*.js",
       "./util/**/*.js"
     ],
-    "outputPath": "dist"
+    "outputPath": "dist",
+    "targets": [
+      "linux-x64",
+      "win-x64",
+      "macos-x64"
+    ]
   },
   "homepage": "https://github.com/Chaphasilor/video-sync",
   "keywords": [

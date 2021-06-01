@@ -257,17 +257,28 @@ class VideoSyncCommand extends Command {
       subs: selectedTracks.subs ?? [],
     }
       
-    const { videoOffset, confidence } = await calcOffset(answers.destination, answers.source, answers.destinationOffset, answers.sourceOffset, {
-      algorithm,
-      iterations: flags.iterations,
-      searchWidth: flags.searchWidth,
-      searchResolution: flags.searchResolution,
-    })
-    // let videoOffset = 0, confidence = 1
+    let videoOffset
+    let confidence
+    if (flags.forceOffset) {
+      videoOffset = flags.offsetEstimate
+      confidence = 1
+    } else {
+      let result = await calcOffset(answers.destination, answers.source, answers.destinationOffset, answers.sourceOffset, {
+        algorithm,
+        iterations: flags.iterations,
+        searchWidth: flags.searchWidth,
+        searchResolution: flags.searchResolution,
+        maxOffset: flags.maxOffset,
+        offsetEstimate: flags.offsetEstimate,
+        threshold: flags.threshold,
+      })
+      videoOffset = result.videoOffset
+      confidence = result.confidence
+    }
 
     let continueWithMerging = answers.output !== undefined && (selectedTracks.audio.length > 0 || selectedTracks.subs.length > 0)
 
-    if (!flags.confirm && flags.algorithm === `ssim` && confidence < 0.5) {
+    if (continueWithMerging && (!flags.confirm && flags.algorithm === `ssim` && confidence < 0.6)) {
       continueWithMerging = (await inquirer.prompt([{
         type: `confirm`,
         name: `continue`,
@@ -360,12 +371,33 @@ VideoSyncCommand.flags = {
   searchWidth: flags.integer({
     char: `w`,
     description: `width of the search region (in seconds) for video syncing. the program will find the closest matching frame in this region, 'sourceOffset' being the center`,
-    default: 10,
+    default: 20,
+  }),
+  maxOffset: flags.integer({
+    char: `m`,
+    description: `maximum considered offset between the videos (in seconds) for video syncing.`,
+    default: 120,
+  }),
+  offsetEstimate: flags.integer({
+    char: `e`,
+    description: `estimated offset between the two videos (in ms) for video syncing. positive values means that the source video is ahead of the destination video`,
+    default: 0,
+  }),
+  forceOffset: flags.boolean({
+    char: `f`,
+    description: `use the estimated offset as the final offset, no synching`,
+    default: false,
+  }),
+  threshold: flags.string({
+    char: `t`,
+    description: `minimum confidence threshold for video syncing.`,
+    parse: (input) => parseFloat(input),
+    default: 0.6,
   }),
   searchResolution: flags.integer({
     char: `r`,
     description: `resolution of the search region (in frames) for video syncing. increases accuracy at the cost of longer runtime`,
-    default: 40,
+    default: 80,
   }),
   verbose: flags.boolean({
     char: `v`,
