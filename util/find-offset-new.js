@@ -10,10 +10,13 @@ const ms = require(`ms`)
 
 // const stepSize = 250
 const stepSize = 25
+const stepSizeSmall = 25
+const stepSizeLarge = 1000
 
 async function findNextSceneChange(video, startOffset, endOffset) {
 
-  const steps = Math.ceil((endOffset - startOffset) / stepSize)
+  let currentStepSize = stepSizeLarge
+  const steps = Math.ceil((endOffset - startOffset) / currentStepSize)
 
   let framesDir = await fs.mkdtemp(`${os.tmpdir()}/frames`)
   
@@ -41,13 +44,12 @@ async function findNextSceneChange(video, startOffset, endOffset) {
     data: previousFrameData,
   }
   let currentFrame
-  let currentFrameOffset
+  let currentFrameOffset = startOffset + currentStepSize
   let currentFrameData
   let delta
 
-  for (let i = 1; i < steps; i++) {
+  while (currentFrameOffset < endOffset) {
     
-    currentFrameOffset = startOffset + i * stepSize
     seekPosition = currentFrameOffset / 1000.0
     fullOutputPath = `${framesDir}/screenshot_${performance.now()*10000000000000}.bmp`  
 
@@ -66,23 +68,37 @@ async function findNextSceneChange(video, startOffset, endOffset) {
     }
 
     delta = 1 - ssim(previousFrame.data, currentFrame.data).mssim;
+    console.log(`delta:`, delta)
 
     if (delta > 0.5) {
-      
-      return {
-        preSceneChangeFrame: previousFrame,
-        postSceneChangeFrame: currentFrame,
-        delta,
+      // scene change detected
+
+      if (currentStepSize === stepSizeSmall) {
+        // already in high-accuracy mode
+
+        return {
+          preSceneChangeFrame: previousFrame,
+          postSceneChangeFrame: currentFrame,
+          delta,
+        }
+
+      } else {
+        console.log(`Switching to high-accuracy mode...`);
+
+        // backtrack to preSceneChange frame offset
+        // previousFrame is the preSceneChange frame, so in the next iteration previous and current frame will be the same, that's fine
+        currentFrameOffset = previousFrame.offset
+        currentStepSize = stepSizeSmall // switch to small step size for increased accuracy
+        // fs.unlink(currentFrame.path) // discard old, unneeded frame
+        
       }
       
     } else {
       fs.unlink(previousFrame.path) // discard old, unneeded frame
       previousFrame = currentFrame
     }
-    
-    // extract frame
-    // calc similarity between previous and current frame
-    // if sim < 0.7 => large delta => scene change => break
+
+    currentFrameOffset += currentStepSize // go to next frame based on current step size
     
   }
 
