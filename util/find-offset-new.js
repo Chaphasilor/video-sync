@@ -8,15 +8,14 @@ const resizeImg = require('resize-img')
 const ssim = require(`ssim.js`).default
 const ms = require(`ms`)
 
-// const stepSize = 250
-const stepSize = 25
 const stepSizeSmall = 25
+const stepSizeMedium = 150
 const stepSizeLarge = 1000
 
 async function findNextSceneChange(video, startOffset, endOffset) {
 
-  let currentStepSize = stepSizeLarge
-  const steps = Math.ceil((endOffset - startOffset) / currentStepSize)
+  const direction = startOffset <= endOffset ? 1 : -1
+  let currentStepSize = direction * stepSizeLarge
 
   let framesDir = await fs.mkdtemp(`${os.tmpdir()}/frames`)
   
@@ -48,8 +47,12 @@ async function findNextSceneChange(video, startOffset, endOffset) {
   let currentFrameData
   let delta
 
-  while (currentFrameOffset < endOffset) {
+  while (
+    (direction === 1 && currentFrameOffset < endOffset) ||
+    (direction === -1 && currentFrameOffset > endOffset)
+  ) {
     
+    console.log(`currentFrameOffset:`, currentFrameOffset)
     seekPosition = currentFrameOffset / 1000.0
     fullOutputPath = `${framesDir}/screenshot_${performance.now()*10000000000000}.bmp`  
 
@@ -68,12 +71,12 @@ async function findNextSceneChange(video, startOffset, endOffset) {
     }
 
     delta = 1 - ssim(previousFrame.data, currentFrame.data).mssim;
-    console.log(`delta:`, delta)
+    // console.log(`delta:`, delta)
 
     if (delta > 0.5) {
       // scene change detected
 
-      if (currentStepSize === stepSizeSmall) {
+      if (currentStepSize === direction * stepSizeSmall) {
         // already in high-accuracy mode
 
         return {
@@ -82,14 +85,25 @@ async function findNextSceneChange(video, startOffset, endOffset) {
           delta,
         }
 
-      } else {
+      } else if (currentStepSize === direction * stepSizeMedium) {
         console.log(`Switching to high-accuracy mode...`);
 
         // backtrack to preSceneChange frame offset
         // previousFrame is the preSceneChange frame, so in the next iteration previous and current frame will be the same, that's fine
         currentFrameOffset = previousFrame.offset
-        currentStepSize = stepSizeSmall // switch to small step size for increased accuracy
+        currentStepSize = direction * stepSizeSmall // switch to small step size for increased accuracy
         // fs.unlink(currentFrame.path) // discard old, unneeded frame
+        continue // don't increase currentFrameOffset, jump right back to the top
+        
+      } else {
+        console.log(`Switching to medium-accuracy mode...`);
+
+        // backtrack to preSceneChange frame offset
+        // previousFrame is the preSceneChange frame, so in the next iteration previous and current frame will be the same, that's fine
+        currentFrameOffset = previousFrame.offset
+        currentStepSize = direction * stepSizeMedium // switch to small step size for increased accuracy
+        // fs.unlink(currentFrame.path) // discard old, unneeded frame
+        continue // don't increase currentFrameOffset, jump right back to the top
         
       }
       
@@ -117,11 +131,13 @@ async function calculateOffset(video1, video2) {
   let video1Data = await ffprobe(video1)
   let video1Duration = Number(video1Data.format.duration) * 1000 // offset in ms
   let offset1 = Math.round(video1Duration/2)
-  let video1SceneChange = await findNextSceneChange(video1, offset1, offset1 + 60000)
+  let video1SceneChange = await findNextSceneChange(video1, offset1, offset1 - 60000)
 
-  let offset2 = video1SceneChange.preSceneChangeFrame.offset - 3*stepSize // use multiples of `findNextSceneChange()`'s stepSize
+  console.log(`video1SceneChange.preSceneChangeFrame.offset:`, video1SceneChange.preSceneChangeFrame.offset)
+  let offset2 = video1SceneChange.preSceneChangeFrame.offset + 3*stepSizeSmall // use multiples of `findNextSceneChange()`'s stepSize
+  console.log(`offset2:`, offset2)
   console.log(`Finding scene change in other video...`)
-  let video2SceneChange = await findNextSceneChange(video2, offset2, offset2 + 5000)
+  let video2SceneChange = await findNextSceneChange(video2, offset2, offset2 - 10000)
 
   if (video1SceneChange.preSceneChangeFrame.data.width !== video2SceneChange.preSceneChangeFrame.data.width || video1SceneChange.preSceneChangeFrame.data.height !== video2SceneChange.preSceneChangeFrame.data.height) {
     console.log(`resizing...`)
@@ -190,7 +206,7 @@ calculateOffset(`/mnt/c/Users/Chaphasilor/Videos/hobbit_1_ee.mp4`, `/mnt/c/Users
 // every time a scene change is found, compare the delta, as well as both pre- and both post-scene change frames with each other to determine, if the same scene change has been found
 // if not found in an iteration, increase the search radius, excluding the already searched offsets (except for the edges)
 
-//TODO ~~maybe use smaller step sizes?~~ use large step sizes to find the scene change fast, than go back to the current preSceneChange frame and use very small step sizes to find the exact frames, return the used step size for use with the other video
+// ~~maybe use smaller step sizes?~~ use large step sizes to find the scene change fast, than go back to the current preSceneChange frame and use very small step sizes to find the exact frames, return the used step size for use with the other video
 //TODO if the scene change can't be found around 0ms offset, increase the search radius in 5-10s increments (left and right), possibly searching from the inside out
 //TODO add a `searchDirection` or `decrement/increment` param to the findNextSceneChange function
 // just save the previous end offset (postSceneChange frame) for both sides and continue there, making sure to not search longer than the increment on either side (in order to search more or less evenly)
