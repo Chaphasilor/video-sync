@@ -73,6 +73,8 @@ async function findNextSceneChange(video, startOffset, endOffset) {
     delta = 1 - ssim(previousFrame.data, currentFrame.data).mssim;
     // console.log(`delta:`, delta)
 
+    //TODO remember highest (farthest) offset in previous mode; if this offset is surpassed in a mode with higher accuracy, then it's a transition and we can switch back to low-accuracy mode to find the next scene change 
+    
     if (delta > 0.5) {
       // scene change detected
 
@@ -123,21 +125,10 @@ async function findNextSceneChange(video, startOffset, endOffset) {
   
 }
 
-// findSceneChange(`/mnt/v/Media/TV Shows/Game of Thrones (2011) (de)/S8/Game of Thrones - S8E01 (german).mp4`).then(console.log)
-// findSceneChange(`/mnt/c/Users/Chaphasilor/Videos/hobbit_1_ee.mp4`).then(console.log)
-
-async function calculateOffset(video1, video2) {
-
-  let video1Data = await ffprobe(video1)
-  let video1Duration = Number(video1Data.format.duration) * 1000 // offset in ms
-  let offset1 = Math.round(video1Duration/2)
-  let video1SceneChange = await findNextSceneChange(video1, offset1, offset1 - 60000)
-
-  console.log(`video1SceneChange.preSceneChangeFrame.offset:`, video1SceneChange.preSceneChangeFrame.offset)
-  let offset2 = video1SceneChange.preSceneChangeFrame.offset + 3*stepSizeSmall // use multiples of `findNextSceneChange()`'s stepSize
-  console.log(`offset2:`, offset2)
-  console.log(`Finding scene change in other video...`)
-  let video2SceneChange = await findNextSceneChange(video2, offset2, offset2 - 10000)
+async function searchForMatchingScene(video2, video1SceneChange, startOffset, endOffset) {
+  
+  console.log(`Searching for matching scene...`)
+  let video2SceneChange = await findNextSceneChange(video2, startOffset, endOffset)
 
   if (video1SceneChange.preSceneChangeFrame.data.width !== video2SceneChange.preSceneChangeFrame.data.width || video1SceneChange.preSceneChangeFrame.data.height !== video2SceneChange.preSceneChangeFrame.data.height) {
     console.log(`resizing...`)
@@ -156,29 +147,103 @@ async function calculateOffset(video1, video2) {
   let preSceneChangeFrameSimilarity = ssim(video1SceneChange.preSceneChangeFrame.data, video2SceneChange.preSceneChangeFrame.data).mssim
   let postSceneChangeFrameSimilarity = ssim(video1SceneChange.postSceneChangeFrame.data, video2SceneChange.postSceneChangeFrame.data).mssim
 
-  console.log(`preSceneChangeFrameSimilarity:`, preSceneChangeFrameSimilarity)
-  console.log(`postSceneChangeFrameSimilarity:`, postSceneChangeFrameSimilarity)
-  console.log(`Math.abs(video1SceneChange.delta - video2SceneChange.delta):`, Math.abs(video1SceneChange.delta - video2SceneChange.delta))
-  
-  if (
-    (preSceneChangeFrameSimilarity > 0.6 && postSceneChangeFrameSimilarity > 0.6 && Math.abs(video1SceneChange.delta - video2SceneChange.delta) < 0.03) ||
-    (preSceneChangeFrameSimilarity > 0.9 && postSceneChangeFrameSimilarity > 0.9 && Math.abs(video1SceneChange.delta - video2SceneChange.delta) < 0.1)
-  ) {
-    // matching scene found
-    return video1SceneChange.preSceneChangeFrame.offset - video2SceneChange.preSceneChangeFrame.offset
-  } else {
-    //TODO retry the same with different offsets
+  let deltaOfDeltas = Math.abs(video1SceneChange.delta - video2SceneChange.delta)
+
+  return {
+    video2SceneChange,
+    preSceneChangeFrameSimilarity,
+    postSceneChangeFrameSimilarity,
+    deltaOfDeltas,
   }
-
-  return false
-
+  
 }
 
-calculateOffset(`/mnt/c/Users/Chaphasilor/Videos/hobbit_1_ee.mp4`, `/mnt/c/Users/Chaphasilor/Videos/The Hobbit - An Unexpected Journey (Extended Edition).mp4`)
-// calculateOffset(`/mnt/c/Users/Chaphasilor/Videos/Star Wars - The Bad Batch - 1x03.mkv`, `/mnt/c/Users/Chaphasilor/Videos/BadBatchCopy.mkv`)
-// calculateOffset(`/mnt/v/Media/TV Shows/Game of Thrones (2011)/Season 6/Game of Thrones - 6x01.mkv`, `/mnt/v/Media/TV Shows/Game of Thrones (2011) (de)/S6/Game of Thrones - S6E1.mp4`)
-// calculateOffset(`/mnt/v/Media/TV Shows/Game of Thrones (2011)/Season 6/Game of Thrones - 6x03.mkv`, `/mnt/v/Media/TV Shows/Game of Thrones (2011) (de)/S6/Game of Thrones - S6E3.mp4`)
-// calculateOffset(`/mnt/v/Media/TV Shows/Game of Thrones (2011)/Season 8/Game of Thrones - 8x01.mkv`, `/mnt/v/Media/TV Shows/Game of Thrones (2011) (de)/S8/Game of Thrones - S8E01 (german).mp4`)
+async function calculateOffset(video1, video2, maxOffset) {
+
+  const searchIncrementSize = 10000 // maximum search area to find the next scene before switching sides
+  
+  // search starts upwards
+  let direction = 1
+  
+  let video1Data = await ffprobe(video1)
+  let video1Duration = Number(video1Data.format.duration) * 1000 // offset in ms
+  let offset1 = Math.round(video1Duration/2)
+  
+  let video1SceneChange = await findNextSceneChange(video1, offset1, offset1 + (direction * maxOffset))
+
+  console.log(`video1SceneChange.preSceneChangeFrame.offset:`, video1SceneChange.preSceneChangeFrame.offset)
+  let currentSearchStart = video1SceneChange.preSceneChangeFrame.offset - (direction * 3*stepSizeSmall) // move the offset back a bit to make sure the 0 ms offset is included in the first iteration
+  
+  // initialize offsets with the same value
+  let currentSearchOffsets = {
+    lower: currentSearchStart,
+    upper: currentSearchStart,
+  }
+  
+  
+  // make sure to stay within offset bounds
+  while (
+    (direction === 1 && (currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset) < maxOffset) ||
+    (direction === -1 && (video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower) < maxOffset)
+  ) {
+
+    console.log(`Finding scene change in other video...`)  
+    
+    currentSearchStart = direction === 1 ? currentSearchOffsets.upper : currentSearchOffsets.lower
+    console.log(`currentSearchOffset:`, currentSearchStart)
+    let currentSearchEnd = currentSearchStart + (direction*searchIncrementSize)
+
+    let sceneComparison
+    try {
+      sceneComparison = await searchForMatchingScene(video2, video1SceneChange, currentSearchStart, currentSearchEnd)
+    } catch (err) {
+      // no scene change found until currentSearchEnd
+      
+      console.log(`No scene change found until currentSearchEnd (${currentSearchEnd})`);
+      
+      if (direction === 1) {
+        currentSearchOffsets.upper = currentSearchEnd
+      } else {
+        currentSearchOffsets.lower = currentSearchEnd
+      }
+      direction = direction * -1
+      continue
+    }
+    
+    console.log(`sceneComparison:`, sceneComparison)
+
+    if (
+      (sceneComparison.preSceneChangeFrameSimilarity > 0.6 && sceneComparison.postSceneChangeFrameSimilarity > 0.6 && (await sceneComparison).deltaOfDeltas < 0.03) ||
+      (sceneComparison.preSceneChangeFrameSimilarity > 0.9 && sceneComparison.postSceneChangeFrameSimilarity > 0.9 && (await sceneComparison).deltaOfDeltas < 0.1)
+    ) {
+      // matching scene found
+      return video1SceneChange.preSceneChangeFrame.offset - sceneComparison.video2SceneChange.preSceneChangeFrame.offset
+    } else {
+      //TODO retry the same with different offsets
+
+      if (direction === 1) {
+        currentSearchOffsets.upper = sceneComparison.video2SceneChange.postSceneChangeFrame.offset
+        console.log(`Current offset (upper):`, ms(currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset));
+      } else {
+        currentSearchOffsets.lower = sceneComparison.video2SceneChange.postSceneChangeFrame.offset
+        console.log(`Current offset (lower):`, ms(video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower));
+      }
+
+      direction = direction * -1
+      
+    }
+    
+  }
+
+  throw new Error("Failed to match scenes!")
+  
+}
+
+// calculateOffset(`/mnt/c/Users/Chaphasilor/Videos/hobbit_1_ee.mp4`, `/mnt/c/Users/Chaphasilor/Videos/The Hobbit - An Unexpected Journey (Extended Edition).mp4`, 90*1000)
+// calculateOffset(`/mnt/c/Users/Chaphasilor/Videos/Star Wars - The Bad Batch - 1x03.mkv`, `/mnt/c/Users/Chaphasilor/Videos/BadBatchCopy.mkv`, 90*1000)
+// calculateOffset(`/mnt/v/Media/TV Shows/Game of Thrones (2011)/Season 6/Game of Thrones - 6x01.mkv`, `/mnt/v/Media/TV Shows/Game of Thrones (2011) (de)/S6/Game of Thrones - S6E1.mp4`, 90*1000)
+// calculateOffset(`/mnt/v/Media/TV Shows/Game of Thrones (2011)/Season 6/Game of Thrones - 6x03.mkv`, `/mnt/v/Media/TV Shows/Game of Thrones (2011) (de)/S6/Game of Thrones - S6E3.mp4`, 90*1000)
+calculateOffset(`/mnt/v/Media/TV Shows/Game of Thrones (2011)/Season 8/Game of Thrones - 8x01.mkv`, `/mnt/v/Media/TV Shows/Game of Thrones (2011) (de)/S8/Game of Thrones - S8E01 (german).mp4`, 90*1000)
 .then(console.log)
 
 
