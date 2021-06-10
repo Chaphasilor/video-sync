@@ -13,6 +13,7 @@ const ora = require('ora');
 const ms = require(`ms`)
 
 const { ALGORITHMS, calcOffset } = require(`../util/calc-offset`)
+const { calculateOffset } = require(`../util/find-offset-new`)
 const merge = require(`../util/merge-tracks`)
 const tracks = require(`../util/tracks`)
 
@@ -263,12 +264,14 @@ class VideoSyncCommand extends Command {
       videoOffset = flags.offsetEstimate
       confidence = 1
     } else {
-      let result = await calcOffset(answers.destination, answers.source, answers.destinationOffset, answers.sourceOffset, {
+      // let result = await calcOffset(answers.destination, answers.source, answers.destinationOffset, answers.sourceOffset, {
+      let result = await calculateOffset(answers.destination, answers.source, {
         algorithm,
         iterations: flags.iterations,
         searchWidth: flags.searchWidth,
         searchResolution: flags.searchResolution,
-        maxOffset: flags.maxOffset,
+        // maxOffset: flags.maxOffset,
+        maxOffset: flags.maxOffset * 1000,
         offsetEstimate: flags.offsetEstimate,
         threshold: flags.threshold,
       })
