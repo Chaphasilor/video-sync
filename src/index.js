@@ -27,7 +27,7 @@ class VideoSyncCommand extends Command {
     // console.warn(`args:`, args)
     // console.warn(`flags:`, flags)
     
-    let prompt = Object.values(args).filter(x => x !== undefined).length !== 4
+    let prompt = Object.values(args).filter(x => x !== undefined).length < 2
     let answers
 
     if (prompt) {
