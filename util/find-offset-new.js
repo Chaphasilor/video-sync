@@ -172,6 +172,9 @@ async function searchForMatchingScene(video2, video1SceneChange, startOffset, en
 
 async function calculateOffset(video1, video2, options) {
 
+  //TODO add support for options.offsetEstimate
+  //TODO add flag to specify search direction (e.g. if known whether the source is ahead or behind the destination)
+
   const video1SearchLength = 300 * 1000
   const searchIncrementSize = 10000 // maximum search area to find the next scene before switching sides
   const startTime = Date.now();
@@ -250,9 +253,9 @@ async function calculateOffset(video1, video2, options) {
         (direction === -1 && (currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset) < options.maxOffset)
       ) {
         direction = direction * -1
-        console.info(`changing direction to ${direction}`)
+        console.debug(`changing direction to ${direction}`)
       } else {
-        console.warn(`NOT changing direction!`)
+        console.debug(`NOT changing direction!`)
       }
       
       continue
@@ -265,7 +268,7 @@ async function calculateOffset(video1, video2, options) {
       (sceneComparison.preSceneChangeFrameSimilarity > 0.9 && sceneComparison.postSceneChangeFrameSimilarity > 0.9 && (await sceneComparison).deltaOfDeltas < 0.1)
     ) {
       // matching scene found
-      console.log(`Found matching scene after ${ms(Date.now() - startTime)}`);
+      console.info(`Found matching scene after ${ms(Date.now() - startTime)}`);
 
       // remove tmp folder
       await fs.rm(`tmp`, {
@@ -282,10 +285,10 @@ async function calculateOffset(video1, video2, options) {
 
       if (direction === 1) {
         currentSearchOffsets.upper = sceneComparison.video2SceneChange.postSceneChangeFrame.offset
-        console.log(`Current offset (upper):`, ms(currentSearchOffsets.upper - video1SceneChange.postSceneChangeFrame.offset));
+        console.debug(`Current offset (upper):`, ms(currentSearchOffsets.upper - video1SceneChange.postSceneChangeFrame.offset));
       } else {
         currentSearchOffsets.lower = sceneComparison.video2SceneChange.preSceneChangeFrame.offset
-        console.log(`Current offset (lower):`, ms(video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower));
+        console.debug(`Current offset (lower):`, ms(video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower));
       }
 
       // only change direction if the other direction hasn't surpassed the offset yet
@@ -294,9 +297,9 @@ async function calculateOffset(video1, video2, options) {
         (direction === -1 && (currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset) < options.maxOffset)
       )  {
         direction = direction * -1
-        console.info(`changing direction to ${direction}`)
+        console.debug(`changing direction to ${direction}`)
       } else {
-        console.warn(`NOT changing direction!`)
+        console.debug(`NOT changing direction!`)
       }
       
     }
@@ -320,6 +323,7 @@ module.exports.calculateOffset = calculateOffset
 // calculateOffset(`/mnt/v/Media/TV Shows/Game of Thrones (2011)/Season 6/Game of Thrones - 6x03.mkv`, `/mnt/v/Media/TV Shows/Game of Thrones (2011) (de)/S6/Game of Thrones - S6E3.mp4`, 90*1000)
 //!!!
 // calculateOffset(`/mnt/c/Users/Chaphasilor/Videos/Game of Thrones - 7x02.mkv`, `/mnt/c/Users/Chaphasilor/Videos/Game of Thrones - S7E02.mp4`, {
+// calculateOffset(`/mnt/c/Users/Chaphasilor/Videos/Game of Thrones - 7x02.mkv`, `/mnt/v/Media/TV Shows/Game of Thrones (2011) (de)/HQ/Staffel 7/Game of Thrones 0702.mp4`, {
 //   maxOffset: 240*1000,
 // })
 // .then(async result => {
@@ -335,39 +339,6 @@ module.exports.calculateOffset = calculateOffset
 //   })
 // })
 
-
-// (async () => {
-//   // let img = await resizeImg(await fs.readFile(`/mnt/c/Users/Chaphasilor/Downloads/frames2DBqeD/screenshot_1789445974999964200.bmp`), {
-//   //   format: `bmp`,
-//   //   width: 720,
-//   //   height: 400,
-//   // })
-  
-//   // await fs.writeFile(`/mnt/c/Users/Chaphasilor/Downloads/frames2DBqeD/resized.bmp`, img)
-//   let result = ssim(
-//     // bmp.decode(await fs.readFile(`/mnt/c/Users/Chaphasilor/Videos/test1.bmp`)),
-//     bmp.decode(await resizeImg(await fs.readFile(`/mnt/c/Users/Chaphasilor/Downloads/framesKKDfwj/screenshot_1814112755999937500.bmp`), {
-//       format: `bmp`,
-//       width: 1920,
-//       height: 960,
-//     })),
-//     bmp.decode(await fs.readFile(`/mnt/c/Users/Chaphasilor/Downloads/frames2DBqeD/screenshot_1789445974999964200.bmp`))
-//   ).mssim
-//   console.log(`result:`, result)
-// })()
-
-// use `findSceneChange()` to find scene changes in the other video, starting at the new offset
-// every time a scene change is found, compare the delta, as well as both pre- and both post-scene change frames with each other to determine, if the same scene change has been found
-// if not found in an iteration, increase the search radius, excluding the already searched offsets (except for the edges)
-
-// ~~maybe use smaller step sizes?~~ use large step sizes to find the scene change fast, than go back to the current preSceneChange frame and use very small step sizes to find the exact frames, return the used step size for use with the other video
-//TODO if the scene change can't be found around 0ms offset, increase the search radius in 5-10s increments (left and right), possibly searching from the inside out
-//TODO add a `searchDirection` or `decrement/increment` param to the findNextSceneChange function
-// just save the previous end offset (postSceneChange frame) for both sides and continue there, making sure to not search longer than the increment on either side (in order to search more or less evenly)
-// don't forget to swap pre- and postSceneChange frames when searching from right to left
-//TODO search until the scene is found or until a maximum offset (e.g. 5m) is reached on both sides
-//TODO add flag to specify search direction (e.g. if known whether the source is ahead or behind the destination)
-
 //[ ] when automating, use the previously found offset as an estimate for following videos (if videos from the same source) 
 
-//TODO what happens when there are multiple similar scene changes?
+//[ ] what happens when there are multiple similar scene changes?

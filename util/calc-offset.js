@@ -48,8 +48,8 @@ async function generateRandomStaticFrame(offset, staticFrameInput, staticFrameDi
 
 module.exports.ALGORITHMS = ALGORITHMS
 
-module.exports.calcOffset = async function(video1Path, video2Path, offset1, offset2, options = {
-  algorithm: ALGORITHMS.SSIM,
+module.exports.calcOffset = async function(video1Path, video2Path, options = {
+  comparisonAlgorithm: ALGORITHMS.SSIM,
 }) {
 
   //TODO expose this
@@ -127,7 +127,7 @@ module.exports.calcOffset = async function(video1Path, video2Path, offset1, offs
     console.debug(`exportedFrames:`, exportedFrames)
     
     try {
-      closestMatch = await findClosestFrame(staticFramePath, rollingFramesDir, options.algorithm, iteration === 0)
+      closestMatch = await findClosestFrame(staticFramePath, rollingFramesDir, options.comparisonAlgorithm, iteration === 0)
     } catch (err) {
       // finding an extact match not possible, use different offsets
       console.log(`Error while trying to find the closest matching frame: ${err.message}`)

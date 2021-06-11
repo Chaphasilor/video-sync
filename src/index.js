@@ -27,19 +27,6 @@ class VideoSyncCommand extends Command {
     // console.warn(`args:`, args)
     // console.warn(`flags:`, flags)
     
-    let algorithm
-    switch (flags.algorithm) {
-      case `ssim`:
-        algorithm = ALGORITHMS.SSIM
-        break;
-      case `matching-pixels`:
-        algorithm = ALGORITHMS.MISMATCHED_PIXELS
-        break;
-      default:
-        algorithm = ALGORITHMS.SSIM
-        break;
-    }
-    
     let prompt = Object.values(args).filter(x => x !== undefined).length !== 4
     let answers
 
@@ -59,25 +46,6 @@ class VideoSyncCommand extends Command {
         },
         {
           type: `input`,
-          message: `Enter the offset (in ms or with units) for the destination file (where to start looking for matching frames while synching)`,
-          name: `destinationOffset`,
-          validate: (formattedInput) => {
-            if (formattedInput === undefined) {
-              return `Didn't recognize that time string! Valid units: ms, s, m, h.`
-            } else if (formattedInput < 0) {
-              return `Only positive offsets are supported. '0' is the beginning of the video.`
-            } else {
-              return true
-            }
-          },
-          filter: (input) => {
-            let matches = input.match(/(\-\s*)\d/g)?.map(x => x.slice(0, -1)) || []
-            input = matches.reduce((sum, cur) => sum.replace(cur, `-`), input)
-            return input.split(` `).reduce((sum, cur) => sum + ms(cur), 0)
-          },
-        },
-        {
-          type: `input`,
           message: `Enter the source file (that contains the new tracks to be synced over)`,
           name: `source`,
           validate: function (answer) {
@@ -85,25 +53,6 @@ class VideoSyncCommand extends Command {
               return `The path you provided doesn't exist. Please provide a valid path to a video file.`;
             }
             return true;
-          },
-        },
-        {
-          type: `input`,
-          message: `Enter the offset (in ms or with units) for the source file (where to start looking for matching frames while syncing)`,
-          name: `sourceOffset`,
-          validate: (formattedInput) => {
-            if (formattedInput === undefined || isNaN(formattedInput)) {
-              return `Didn't recognize that time string! Valid units: ms, s, m, h.`
-            } else if (formattedInput < 0) {
-              return `Only positive offsets are supported. '0' is the beginning of the video.`
-            } else {
-              return true
-            }
-          },
-          filter: (input) => {
-            let matches = input.match(/(\-\s*)\d/g)?.map(x => x.slice(0, -1)) || []
-            input = matches.reduce((sum, cur) => sum.replace(cur, `-`), input)
-            return input.split(` `).reduce((sum, cur) => sum + ms(cur), 0)
           },
         },
         {
@@ -264,17 +213,25 @@ class VideoSyncCommand extends Command {
       videoOffset = flags.offsetEstimate
       confidence = 1
     } else {
-      // let result = await calcOffset(answers.destination, answers.source, answers.destinationOffset, answers.sourceOffset, {
-      let result = await calculateOffset(answers.destination, answers.source, {
-        algorithm,
-        iterations: flags.iterations,
-        searchWidth: flags.searchWidth,
-        searchResolution: flags.searchResolution,
-        // maxOffset: flags.maxOffset,
-        maxOffset: flags.maxOffset * 1000,
-        offsetEstimate: flags.offsetEstimate,
-        threshold: flags.threshold,
-      })
+      let result
+      
+      if (flags.algorithm === `simple`) {
+        result = await calcOffset(answers.destination, answers.source, {
+          comparisonAlgorithm: ALGORITHMS.SSIM,
+          iterations: flags.iterations,
+          searchWidth: flags.searchWidth,
+          searchResolution: flags.searchResolution,
+          maxOffset: flags.maxOffset,
+          offsetEstimate: flags.offsetEstimate,
+          threshold: flags.threshold,
+        })
+      } else {
+        result = await calculateOffset(answers.destination, answers.source, {
+          maxOffset: flags.maxOffset * 1000,
+          offsetEstimate: flags.offsetEstimate,
+        })
+      }
+
       videoOffset = result.videoOffset
       confidence = result.confidence
     }
@@ -315,19 +272,9 @@ VideoSyncCommand.args = [
     description: `video where tracks should be added to`,
   },
   {
-    name: `destinationOffset`,
-    required: false,
-    description: `frame offset for the destination video`,
-  },
-  {
     name: `source`,
     required: false,
     description: `video where the tracks are copied from`,
-  },
-  {
-    name: `sourceOffset`,
-    required: false,
-    description: `frame offset for the source video`,
   },
 ]
 
@@ -362,18 +309,18 @@ VideoSyncCommand.flags = {
   }),
   algorithm: flags.enum({
     char: `g`,
-    description: `matching algorithm to use for video syncing`,
-    options: [`ssim`, `matching-pixels`],
-    default: `ssim`,
+    description: `search algorithm to use for video syncing`,
+    options: [`simple`, `matching-scene`],
+    default: `matching-scene`,
   }),
   iterations: flags.integer({
     char: `i`,
-    description: `number of iterations to perform for video syncing`,
+    description: `number of iterations to perform for video syncing (requires algorithm=simple)`,
     default: 2,
   }),
   searchWidth: flags.integer({
     char: `w`,
-    description: `width of the search region (in seconds) for video syncing. the program will find the closest matching frame in this region, 'sourceOffset' being the center`,
+    description: `width of the search region (in seconds) for video syncing. the program will find the closest matching frame in this region, 'sourceOffset' being the center (requires algorithm=simple)`,
     default: 20,
   }),
   maxOffset: flags.integer({
@@ -393,13 +340,13 @@ VideoSyncCommand.flags = {
   }),
   threshold: flags.string({
     char: `t`,
-    description: `minimum confidence threshold for video syncing.`,
+    description: `minimum confidence threshold for video syncing. (requires algorithm=simple)`,
     parse: (input) => parseFloat(input),
     default: 0.6,
   }),
   searchResolution: flags.integer({
     char: `r`,
-    description: `resolution of the search region (in frames) for video syncing. increases accuracy at the cost of longer runtime`,
+    description: `resolution of the search region (in frames) for video syncing. increases accuracy at the cost of longer runtime (requires algorithm=simple)`,
     default: 80,
   }),
   verbose: flags.boolean({
