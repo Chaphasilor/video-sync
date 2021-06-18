@@ -260,9 +260,11 @@ class VideoSyncCommand extends Command {
   }
 }
 
-VideoSyncCommand.description = `Describe the command here
-...
-Extra documentation goes here
+VideoSyncCommand.description = `video-sync - a tool for automating the process of muxing additional audio tracks into videos
+This tool requires the two input videos, the one where you want to add the additional tracks *to* (the destination video) and the one where you take the additional tracks *from* (the source video).
+It then tries to find the exact same frame in both videos, in order to synchronize them (in case one of them is longer or shorter than the other).
+It allows you to pick the audio and subtitle tracks you want to add to the destination and specify the output file.
+There's an interactive mode (simply don't pass any arguments, flags work) and a CLI mode (pass the two arguments listed at the top).
 `
 
 VideoSyncCommand.args = [

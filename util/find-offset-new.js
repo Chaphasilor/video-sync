@@ -172,6 +172,8 @@ async function searchForMatchingScene(video2, video1SceneChange, startOffset, en
 
 async function calculateOffset(video1, video2, options) {
 
+  //TODO add cli progress output
+
   //TODO add support for options.offsetEstimate
   //TODO add flag to specify search direction (e.g. if known whether the source is ahead or behind the destination)
 
