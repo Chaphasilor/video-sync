@@ -1,4 +1,3 @@
-const os = require(`os`)
 const fs = require('fs/promises')
 const { exec } = require(`node-exec-promise`)
 const { performance } = require(`perf_hooks`)
@@ -7,6 +6,7 @@ const bmp = require(`bmp-js`)
 const resizeImg = require('resize-img')
 const ssim = require(`ssim.js`).default
 const ms = require(`ms`)
+const ora = require('ora');
 
 const stepSizeSmall = 25
 const stepSizeMedium = 150
@@ -180,6 +180,7 @@ async function calculateOffset(video1, video2, options) {
   const video1SearchLength = 300 * 1000
   const searchIncrementSize = 10000 // maximum search area to find the next scene before switching sides
   const startTime = Date.now();
+  const spinner = ora(`Syncing the videos...`).start();
   
   // create the tmp folder if it doesn't exist yet
   try {
@@ -187,9 +188,13 @@ async function calculateOffset(video1, video2, options) {
   } catch (err) {
     await fs.mkdir(`tmp`)
   }
-  
+
   // search starts upwards
   let direction = 1
+  
+  if (options.searchDirection) {
+    direction = options.searchDirection
+  }
   
   let video1Data = await ffprobe(video1)
   let video2Data = await ffprobe(video2)
@@ -207,7 +212,8 @@ async function calculateOffset(video1, video2, options) {
 
   console.debug(`Video 1 pre-scene change frame offset:`, video1SceneChange.preSceneChangeFrame.offset)
   let currentSearchStart = video1SceneChange.preSceneChangeFrame.offset - (direction * 3*stepSizeSmall) // move the offset back a bit to make sure the 0 ms offset is included in the first iteration
-  // currentSearchStart = video1SceneChange.preSceneChangeFrame.offset - 70 * 1000 //FIXME implement `estimate` option
+  
+  currentSearchStart += options.offsetEstimate // add the offsetEstimate to the search center for the second video 
 
   // initialize offsets with the same value
   let currentSearchOffsets = {
@@ -220,11 +226,11 @@ async function calculateOffset(video1, video2, options) {
   while (
     currentSearchOffsets.upper < video2Duration &&
     currentSearchOffsets.lower > 0 &&
-    ((currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset) < options.maxOffset ||
-    (video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower) < options.maxOffset)
+    ((currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset - options.offsetEstimate) < options.maxOffset ||
+    (video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower - options.offsetEstimate) < options.maxOffset)
   ) {
 
-    console.log(`Finding scene change in other video...`)  
+    console.log(`Finding scene change in other video...`)
     
     currentSearchStart = direction === 1 ? currentSearchOffsets.upper : currentSearchOffsets.lower
     console.log(`currentSearchOffset:`, currentSearchStart)
@@ -251,8 +257,9 @@ async function calculateOffset(video1, video2, options) {
 
       // only change direction if the other direction hasn't surpassed the offset yet
       if (
-        (direction === 1 && (video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower) < options.maxOffset) ||
-        (direction === -1 && (currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset) < options.maxOffset)
+        !options.exclusiveDirection && // only switch direction if no exclusive direction is set
+        (direction === 1 && (video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower - options.offsetEstimate) < options.maxOffset) ||
+        (direction === -1 && (currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset - options.offsetEstimate) < options.maxOffset)
       ) {
         direction = direction * -1
         console.debug(`changing direction to ${direction}`)
@@ -277,10 +284,13 @@ async function calculateOffset(video1, video2, options) {
         recursive: true,
         force: true,
       })
-      return {
+      
+      const result = {
         videoOffset: video1SceneChange.preSceneChangeFrame.offset - sceneComparison.video2SceneChange.preSceneChangeFrame.offset,
         confidence: 1,
       }
+      spinner.succeed(`Source video is approx. ${Math.abs(result.videoOffset)} ms ${result.videoOffset > 0 ? `ahead` : `behind`} destination video (confidence ${result.confidence.toFixed(5)}).`)
+      return result
       
     } else {
       // retry the same with different offsets
@@ -295,8 +305,9 @@ async function calculateOffset(video1, video2, options) {
 
       // only change direction if the other direction hasn't surpassed the offset yet
       if (
-        (direction === 1 && (video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower) < options.maxOffset) ||
-        (direction === -1 && (currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset) < options.maxOffset)
+        !options.exclusiveDirection && // only switch direction if no exclusive direction is set
+        (direction === 1 && (video1SceneChange.preSceneChangeFrame.offset - currentSearchOffsets.lower - options.offsetEstimate) < options.maxOffset) ||
+        (direction === -1 && (currentSearchOffsets.upper - video1SceneChange.preSceneChangeFrame.offset - options.offsetEstimate) < options.maxOffset)
       )  {
         direction = direction * -1
         console.debug(`changing direction to ${direction}`)

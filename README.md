@@ -5,7 +5,7 @@ A tool for automating the process of muxing additional audio tracks into videos
 ## Usage
 
 ```sh-session
-$ video-sync [DESTINATION] [SOURCE] <flags>
+video-sync [DESTINATION] [SOURCE] <flags>
 ```
 
 ## Description
@@ -38,24 +38,26 @@ $ video-sync -h # help page
 
 ## Options
 
-- `-o, --output=output` output file path
+- `-o, --output=<path>` output file path
 
-- `-a, --audioTracks=audioTracks` audio tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced). if omitted, all audio tracks will be synced.
+- `-a, --audioTracks=<list>` audio tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced). if omitted, all audio tracks will be synced.
 
-- `-s, --subsTracks=subsTracks` subtitle tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced). if omitted, all subtitle tracks will be synced
+- `-s, --subsTracks=<list>` subtitle tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced). if omitted, all subtitle tracks will be synced
 
-- `-e, --offsetEstimate=offsetEstimate` estimated offset between the two videos (in ms) for video syncing. positive values means that the source video is ahead of the destination video
+- `-e, --offsetEstimate=<number>` estimated offset between the two videos (in ms) for video syncing. positive values means that the source video is ahead of the destination video
 
 - `-f, --forceOffset` use the estimated offset as the final offset, no synching
 
-- `-g, --algorithm=(simple|matching-scene)` [default: matching-scene] search algorithm to use for video syncing
+- `x, --exclusiveDirection=<ahead|behind>` only search the matching frame offset in one direction. 'ahead' means that the source video scene comes *before* the destination video scene. (requires algorithm=matching-scene)
 
-- `-m, --maxOffset=maxOffset` [default: 120] maximum considered offset between the videos (in seconds) for video syncing.
+- `-g, --algorithm=<simple|matching-scene>` [default: matching-scene] search algorithm to use for video syncing
 
-- `-r, --searchResolution=searchResolution` [default: 80] resolution of the search region (in frames) for video syncing. increases accuracy at the cost of longer runtime (requires algorithm=simple)
-- `-i, --iterations=iterations` [default: 2] number of iterations to perform for video syncing (requires algorithm=simple)
-- `-t, --threshold=threshold` [default: 0.6] minimum confidence threshold for video syncing. (requires algorithm=simple)
-- `-w, --searchWidth=searchWidth` [default: 20] width of the search region (in seconds) for video syncing. the program will find the closest matching frame in this region, 'sourceOffset' being the center (requires algorithm=simple)
+- `-m, --maxOffset=<number>` [default: 120] maximum considered offset between the videos (in seconds) for video syncing.
+
+- `-r, --searchResolution=<number>` [default: 80] resolution of the search region (in frames) for video syncing. increases accuracy at the cost of longer runtime (requires algorithm=simple)
+- `-i, --iterations=<number>` [default: 2] number of iterations to perform for video syncing (requires algorithm=simple)
+- `-t, --threshold=<number>` [default: 0.6] minimum confidence threshold for video syncing. (requires algorithm=simple)
+- `-w, --searchWidth=<number>` [default: 20] width of the search region (in seconds) for video syncing. the program will find the closest matching frame in this region, 'sourceOffset' being the center (requires algorithm=simple)
 
 - `-y, --confirm` automatically confirm missing tracks, low confidence scores and overwrite prompts
 

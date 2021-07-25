@@ -340,6 +340,12 @@ VideoSyncCommand.flags = {
     description: `use the estimated offset as the final offset, no synching`,
     default: false,
   }),
+  exclusiveDirection: flags.string({
+    char: `x`,
+    description: `only search the matching frame offset in one direction. 'ahead' means that the source video scene comes *before* the destination video scene. (requires algorithm=matching-scene)`,
+    parse: (input) => input ? (input === `ahead` ? -1 : 1) : false,
+    default: undefined,
+  }),
   threshold: flags.string({
     char: `t`,
     description: `minimum confidence threshold for video syncing. (requires algorithm=simple)`,
