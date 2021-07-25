@@ -188,14 +188,11 @@ module.exports.calcOffset = async function(video1Path, video2Path, options = {
 
 async function getVideoInfo(vid1, vid2) {
 
-  console.log(`vid1:`, vid1)
-  console.log(`vid2:`, vid2)
   let vid1Data = await probe(vid1)
   let vid2Data = await probe(vid2)
-  console.log(`vid2:`, vid2)
 
-  console.log(`Video 1: width: ${vid1Data.streams[0].width}, height: ${vid1Data.streams[0].height}`)
-  console.log(`Video 2: width: ${vid2Data.streams[0].width}, height: ${vid2Data.streams[0].height}`)
+  console.debug(`Video 1: width: ${vid1Data.streams[0].width}, height: ${vid1Data.streams[0].height}`)
+  console.debug(`Video 2: width: ${vid2Data.streams[0].width}, height: ${vid2Data.streams[0].height}`)
 
   if (vid1Data.streams[0].width > vid2Data.streams[0].width && vid1Data.streams[0].height < vid2Data.streams[0].height) {
     console.warn(`Videos have different aspect ratios. You might get worse results.`)
@@ -219,3 +216,4 @@ async function getVideoInfo(vid1, vid2) {
   }
   
 }
+module.exports.getVideoInfo = getVideoInfo

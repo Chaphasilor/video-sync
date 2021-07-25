@@ -236,6 +236,9 @@ class VideoSyncCommand extends Command {
       confidence = result.confidence
     }
 
+    // check if one of the videos is warped
+    //TODO import and test
+
     let continueWithMerging = answers.output !== undefined && (selectedTracks.audio.length > 0 || selectedTracks.subs.length > 0)
 
     if (continueWithMerging && (!flags.confirm && flags.algorithm === `ssim` && confidence < 0.6)) {

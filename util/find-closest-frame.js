@@ -101,7 +101,7 @@ module.exports.findClosestFrame = async function findClosestFrame(inputFile, fra
   
   }
 
-  if (checkForStaticScene && checkForStaticScene({data: results})) {
+  if (checkForStaticScene && checkStaticScene({data: results})) {
     throw new Error(`Static scene detected!`)
   }
   
