@@ -268,6 +268,7 @@ class VideoSyncCommand extends Command {
         type: `confirm`,
         name: `continue`,
         message: `It seems like one of the videos might be warped (slightly sped up or slowed down). This might make synchronization impossible. Do you want to continue anyway?`,
+        default: false,
       }])).continue
     }
 
