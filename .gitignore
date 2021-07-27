@@ -11,3 +11,6 @@ node_modules
 *.mp4
 *.mkv
 video-sync
+batch.sh
+*.csv
+.vscode/

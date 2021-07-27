@@ -5,13 +5,15 @@ const pixelmatch = require('pixelmatch')
 const resizeImg = require('resize-img')
 const ssim = require(`ssim.js`).default
 
+const { checkStaticScene } = require(`./static-scenes`)
+
 const ALGORITHMS = {
   MISMATCHED_PIXELS: `matching-pixels`,
   SSIM: `ssim`,
 }
 module.exports.ALGORITHMS = ALGORITHMS
 
-module.exports.findClosestFrame = async function findClosestFrame(inputFile, frameInputDir, selectedAlg = ALGORITHMS.SSIM) {
+module.exports.findClosestFrame = async function findClosestFrame(inputFile, frameInputDir, selectedAlg = ALGORITHMS.SSIM, checkForStaticScene) {
 
   const inputImage = bmp.decode(await fs.readFile(inputFile))
   const { width, height } = inputImage
@@ -28,6 +30,8 @@ module.exports.findClosestFrame = async function findClosestFrame(inputFile, fra
     value: selectedAlg === ALGORITHMS.SSIM ? -1 : Infinity,
   }
   
+  let results = []
+  
   for (const file of files) {
   
     let imageToCompare = bmp.decode(await fs.readFile(`${frameInputDir}/${file.name}`));
@@ -43,36 +47,43 @@ module.exports.findClosestFrame = async function findClosestFrame(inputFile, fra
   
     let result
     if (selectedAlg === ALGORITHMS.SSIM) {
-      result = ssim(inputImage, imageToCompare);
+      result = ssim(inputImage, imageToCompare).mssim;
     } else {
       result = pixelmatch(inputImage.data, imageToCompare.data, null, width, height, {threshold: 0.1});
     }
+
+    results.push(result)
   
-    //TODO if closestMatch.value doesn't change at all, somethings fishy (e.g. static scene)
-    // either try again with different offsets or prompt the user, but the former option would be more robust
+    //TODO also trigger on very slight fluctuations for high confidence scores (actual static scenes)
+    // if closestMatch.value doesn't change at all, somethings fishy (e.g. static scene)
+    // => try again with different offsets
+    //TODO check if twice in a row works (because frames aren't exactly timed) or the limit has to be increased
+    if (result === closestMatch.value) {
+      throw new Error(`Got the same result twice, possible static scene!`)
+    }
+    
+    console.log(`result:`, result)
+    
+    // update the new best result/closest match
     if (
-      (selectedAlg === ALGORITHMS.SSIM && result.mssim > closestMatch.value) ||
+      (selectedAlg === ALGORITHMS.SSIM && result > closestMatch.value) ||
       (selectedAlg === ALGORITHMS.MISMATCHED_PIXELS && result < closestMatch.value)
       ) {
         
       switch (selectedAlg) {
         case ALGORITHMS.SSIM:
-          result = ssim(inputImage, imageToCompare);
-          console.log(`result:`, result.mssim)
-          if (result.mssim > closestMatch.value) {
+          if (result > closestMatch.value) {
             closestMatch = {
               filename: file.name,
-              value: result.mssim,
+              value: result,
             }
           }
           break;
         case ALGORITHMS.MISMATCHED_PIXELS:
-          result = pixelmatch(inputImage.data, imageToCompare.data, null, width, height, {threshold: 0.1});
-          console.log(`result:`, result)
           if (result < closestMatch.value) {
             closestMatch = {
               filename: file.name,
-              value: result.mssim,
+              value: result,
             }
           }
           break;
@@ -88,6 +99,10 @@ module.exports.findClosestFrame = async function findClosestFrame(inputFile, fra
       break
     }
   
+  }
+
+  if (checkForStaticScene && checkStaticScene({data: results})) {
+    throw new Error(`Static scene detected!`)
   }
   
   return closestMatch

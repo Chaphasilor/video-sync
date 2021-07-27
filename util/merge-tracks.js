@@ -3,12 +3,14 @@ const probe = require(`node-ffprobe`)
 const cli = require(`cli-ux`).default
 const ora = require('ora');
 const chalk = require('chalk');
+const ms = require(`ms`)
+
 const tracks = require(`./tracks`)
 
 module.exports = function(video1, video2, output, offset, tracksToSync) {
   return new Promise(async (resolve, reject) => {
   
-    let spinner = ora(`Figuring out offsets for audio tracks...`).start();
+    let spinner = ora(`Figuring out offsets for selected tracks...`).start();
     // cli.action.start(`Figuring out offsets for audio tracks`)
     
     let matchedTracks
@@ -75,9 +77,11 @@ module.exports = function(video1, video2, output, offset, tracksToSync) {
     merger.stdout.setEncoding(`utf8`)
     merger.stderr.setEncoding(`utf8`)
 
+    const startTime = Date.now()
     const simpleBar = cli.progress({
-      format: `Muxing output video [${chalk.green('{bar}')}] {percentage} % | ETA: {eta}s`,
+      format: `Muxing output video [${chalk.green('{bar}')}] {percentage} % | ETA: {eta_formatted}`,
       etaBuffer: 7,
+      clearOnComplete: true,
     })
     simpleBar.start(100, 0);
 
@@ -109,7 +113,7 @@ module.exports = function(video1, video2, output, offset, tracksToSync) {
       }
 
       const tempSpinner = ora(``).start();
-      tempSpinner.succeed(`Done.`)
+      tempSpinner.succeed(`Successfully muxed output video in ${ms(Date.now() - startTime)}.`)
 
       return resolve()
 
