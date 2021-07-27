@@ -59,7 +59,7 @@ $ video-sync -h # help page
 - `-t, --threshold=<number>` [default: 0.6] minimum confidence threshold for video syncing. (requires algorithm=simple)
 - `-w, --searchWidth=<number>` [default: 20] width of the search region (in seconds) for video syncing. the program will find the closest matching frame in this region, 'sourceOffset' being the center (requires algorithm=simple)
 
-- `-y, --confirm` automatically confirm missing tracks, low confidence scores and overwrite prompts
+- `-y, --confirm` automatically confirm missing tracks, low confidence scores, warped videos and overwrite prompts
 
 - `-v, --verbose` output additional logs
 
