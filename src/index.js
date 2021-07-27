@@ -316,8 +316,7 @@ VideoSyncCommand.flags = {
   }),
   confirm: flags.boolean({
     char: `y`,
-    description: `automatically confirm missing tracks, low confidence scores and overwrite prompts
-    `,
+    description: `automatically confirm missing tracks, low confidence scores, warped videos and overwrite prompts`,
     required: false, // if omitted, only the offset is printed
     default: false,
   }),
