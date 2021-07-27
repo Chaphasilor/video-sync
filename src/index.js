@@ -16,6 +16,7 @@ const { ALGORITHMS, calcOffset } = require(`../util/calc-offset`)
 const { calculateOffset } = require(`../util/find-offset-new`)
 const merge = require(`../util/merge-tracks`)
 const tracks = require(`../util/tracks`)
+const { validateOffset } = require('../util/warping')
 
 class VideoSyncCommand extends Command {
   async run() {
@@ -237,15 +238,36 @@ class VideoSyncCommand extends Command {
     }
 
     // check if one of the videos is warped
-    //TODO import and test
+    let videoWarped = false
+    const offsetValidationSpinner = ora(`Checking if found offset applies to the whole video...`).start();
+    try {
+      videoWarped = ! await validateOffset(args.destination, args.source, videoOffset)
+    } catch (err) {
+      console.error(`Error while checking if found offset applies to the whole video:`, err)
+    }
 
+    // log warning about warped video
+    if (videoWarped && flags.confirm) {
+      offsetValidationSpinner.warn(`Syncing the tracks might not work well because one of the videos appears to be warped.`)
+    } else if (!videoWarped) {
+      offsetValidationSpinner.succeed(`Offset is valid.`)
+    } else {
+      offsetValidationSpinner.stop()
+    }
+    
     let continueWithMerging = answers.output !== undefined && (selectedTracks.audio.length > 0 || selectedTracks.subs.length > 0)
 
     if (continueWithMerging && (!flags.confirm && flags.algorithm === `ssim` && confidence < 0.6)) {
       continueWithMerging = (await inquirer.prompt([{
         type: `confirm`,
         name: `continue`,
-        message: `Syncing confidence is very low (${confidence}). Do you want to continue?`,
+        message: `Syncing confidence is very low (${confidence}). Do you want to continue anyway?`,
+      }])).continue
+    } else if (continueWithMerging && videoWarped && !flags.confirm) {
+      continueWithMerging = (await inquirer.prompt([{
+        type: `confirm`,
+        name: `continue`,
+        message: `It seems like one of the videos might be warped (slightly sped up or slowed down). This might make synchronization impossible. Do you want to continue anyway?`,
       }])).continue
     }
 

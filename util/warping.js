@@ -4,11 +4,18 @@ const { performance } = require(`perf_hooks`)
 const bmp = require(`bmp-js`)
 const ssim = require(`ssim.js`).default
 const ora = require('ora');
+const resizeImg = require('resize-img')
 const { getVideoInfo } = require("./calc-offset")
 
 async function findClosestFrame(destinationVideo, sourceVideo, destinationTimestamp, offset, radius, stepSize) {
 
-  let framesDir = await fs.mkdtemp(`tmp/frames`)
+  // create the tmp folder if it doesn't exist yet
+  try {
+    await fs.access(`tmp`)
+  } catch (err) {
+    await fs.mkdir(`tmp`)
+  }
+  const framesDir = await fs.mkdtemp(`tmp/frames`)
   
   let seekPosition = destinationTimestamp / 1000.0
   let destinationFrame
@@ -41,12 +48,33 @@ async function findClosestFrame(destinationVideo, sourceVideo, destinationTimest
   }
   
   // extract frame, check similarity, delete it
-  for (const currentOffset = offset-radius; currentOffset <= offset+radius; currentOffset += stepSize) {
+  for (let currentOffset = offset-radius; currentOffset <= offset+radius; currentOffset += stepSize) {
 
     seekPosition = (destinationTimestamp + currentOffset) / 1000.0
     fullOutputPath = `${framesDir}/screenshot_${performance.now()*10000000000000}.bmp`  
 
-    const frameData = await extractFrame(sourceVideo, seekPosition, cropValueSource, fullOutputPath)
+    let frameData = await extractFrame(sourceVideo, seekPosition, cropValueSource, fullOutputPath)
+
+    //TODO instead of only checking image dimensions at the end, do it at the start and then generate the frames from the smaller video
+    //!!! make sure to use the negated offset when swapping source and destination! 
+    if (destinationFrame.width !== frameData.width || destinationFrame.height !== frameData.height) {
+      // make sure to always downsize
+      if (destinationFrame.width*destinationFrame.height >= frameData.width*frameData.height) {
+        // resize destination frame once
+        destinationFrame.data = bmp.decode(await resizeImg(await fs.readFile(destinationFrame.path), {
+          format: `bmp`,
+          width: frameData.width,
+          height: frameData.height,
+        }));
+      } else {
+        // resize every source frame
+        frameData = bmp.decode(await resizeImg(await fs.readFile(fullOutputPath), {
+          format: `bmp`,
+          width: destinationFrame.data.width,
+          height: destinationFrame.data.height,
+        }));
+      }
+    }
 
     similarity = ssim(frameData, destinationFrame.data).mssim;
 
@@ -59,7 +87,11 @@ async function findClosestFrame(destinationVideo, sourceVideo, destinationTimest
     
   }
 
-  await fs.unlink(framesDir)
+  // remove tmp folder
+  await fs.rm(`tmp`, {
+    recursive: true,
+    force: true,
+  })
 
   return mostSimilarFrame
   
@@ -100,8 +132,9 @@ async function validateOffset(destinationVideo, sourceVideo, offsetToTest) {
     
   }
 
-  const offsetDelta = Math.max(mostSimilarFrameOffsets) - Math.min(mostSimilarFrameOffsets)
+  console.debug(`mostSimilarFrameOffsets:`, mostSimilarFrameOffsets)
 
+  const offsetDelta = Math.abs(Math.max(...mostSimilarFrameOffsets) - Math.min(...mostSimilarFrameOffsets))
   if (offsetDelta > 250) {
     return false
   }
@@ -109,3 +142,4 @@ async function validateOffset(destinationVideo, sourceVideo, offsetToTest) {
   return true
   
 }
+module.exports.validateOffset = validateOffset

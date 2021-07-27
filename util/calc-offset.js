@@ -190,6 +190,8 @@ async function getVideoInfo(vid1, vid2) {
 
   let vid1Data = await probe(vid1)
   let vid2Data = await probe(vid2)
+  console.log(`vid1Data:`, vid1Data)
+  console.log(`vid2Data:`, vid2Data)
 
   console.debug(`Video 1: width: ${vid1Data.streams[0].width}, height: ${vid1Data.streams[0].height}`)
   console.debug(`Video 2: width: ${vid2Data.streams[0].width}, height: ${vid2Data.streams[0].height}`)

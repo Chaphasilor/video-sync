@@ -277,7 +277,6 @@ async function calculateOffset(video1, video2, options) {
       (sceneComparison.preSceneChangeFrameSimilarity > 0.9 && sceneComparison.postSceneChangeFrameSimilarity > 0.9 && (await sceneComparison).deltaOfDeltas < 0.1)
     ) {
       // matching scene found
-      console.info(`Found matching scene after ${ms(Date.now() - startTime)}`);
 
       // remove tmp folder
       await fs.rm(`tmp`, {
@@ -289,7 +288,7 @@ async function calculateOffset(video1, video2, options) {
         videoOffset: video1SceneChange.preSceneChangeFrame.offset - sceneComparison.video2SceneChange.preSceneChangeFrame.offset,
         confidence: 1,
       }
-      spinner.succeed(`Source video is approx. ${Math.abs(result.videoOffset)} ms ${result.videoOffset > 0 ? `ahead` : `behind`} destination video (confidence ${result.confidence.toFixed(5)}).`)
+      spinner.succeed(`Source video is approx. ${Math.abs(result.videoOffset)} ms ${result.videoOffset > 0 ? `ahead` : `behind`} destination video. Took ${ms(Date.now() - startTime)}`)
       return result
       
     } else {

@@ -13,3 +13,4 @@ node_modules
 video-sync
 batch.sh
 *.csv
+.vscode/

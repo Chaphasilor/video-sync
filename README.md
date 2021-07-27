@@ -48,7 +48,7 @@ $ video-sync -h # help page
 
 - `-f, --forceOffset` use the estimated offset as the final offset, no synching
 
-- `x, --exclusiveDirection=<ahead|behind>` only search the matching frame offset in one direction. 'ahead' means that the source video scene comes *before* the destination video scene. (requires algorithm=matching-scene)
+- `-x, --exclusiveDirection=<ahead|behind>` only search the matching frame offset in one direction. 'ahead' means that the source video scene comes *before* the destination video scene. (requires algorithm=matching-scene)
 
 - `-g, --algorithm=<simple|matching-scene>` [default: matching-scene] search algorithm to use for video syncing
 
