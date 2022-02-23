@@ -6,6 +6,7 @@ const ssim = require(`ssim.js`).default
 const ora = require('ora');
 const resizeImg = require('resize-img')
 const { getVideoInfo } = require("./calc-offset")
+const ms = require(`ms`)
 
 async function findClosestFrame(destinationVideo, sourceVideo, destinationTimestamp, offset, radius, stepSize) {
 
@@ -137,6 +138,22 @@ async function validateOffset(destinationVideo, sourceVideo, offsetToTest) {
   }
 
   console.debug(`mostSimilarFrameOffsets:`, mostSimilarFrameOffsets)
+
+  testedLengths = [
+    videoInfo.lengths[0] * testPositions.slice(-1)[0] - videoInfo.lengths[0] * testPositions[0],
+    videoInfo.lengths[1] * testPositions.slice(-1)[0] - videoInfo.lengths[1] * testPositions[0],
+  ]
+
+  // artificially shorten or lengthen the second video depending on the offsets
+  testedLengths[1] -= mostSimilarFrameOffsets[0]
+  testedLengths[1] += mostSimilarFrameOffsets.slice(-1)[0]
+
+  let warpFactor = testedLengths[0] / testedLengths[1] // tells by which factor the second video was warped compared to the first video
+  let unwarpFactor = 1/warpFactor
+
+  if (Math.abs(warpFactor - 1) > 0.00001 || console.logLevel >= 4) {
+    console.info(`Second video is warped by a factor of ${warpFactor} (at least between timestamps ${ms(videoInfo.lengths[0] * testPositions[0])} and ${ms(videoInfo.lengths[1] * testPositions.slice(-1)[0])} ), use factor ${unwarpFactor} to un-warp it.`)
+  }
 
   const offsetDelta = Math.abs(Math.max(...mostSimilarFrameOffsets) - Math.min(...mostSimilarFrameOffsets))
   if (offsetDelta > 250) {
