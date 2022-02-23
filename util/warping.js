@@ -84,6 +84,8 @@ async function findClosestFrame(destinationVideo, sourceVideo, destinationTimest
         similarity,
       }
     }
+
+    await fs.rm(fullOutputPath)
     
   }
 
@@ -121,6 +123,8 @@ async function validateOffset(destinationVideo, sourceVideo, offsetToTest) {
   const testStepSize = 50
 
   const videoInfo = await getVideoInfo(destinationVideo, sourceVideo)
+
+  console.debug(`videoInfo:`, videoInfo)
 
   const mostSimilarFrameOffsets = []
 

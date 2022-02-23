@@ -177,8 +177,7 @@ async function calculateOffset(video1, video2, options) {
   //TODO add support for options.offsetEstimate
   //TODO add flag to specify search direction (e.g. if known whether the source is ahead or behind the destination)
 
-  const video1SearchLength = 300 * 1000
-  const searchIncrementSize = 10000 // maximum search area to find the next scene before switching sides
+  
   const startTime = Date.now();
   const spinner = ora(`Syncing the videos...`).start();
   
@@ -188,12 +187,18 @@ async function calculateOffset(video1, video2, options) {
   } catch (err) {
     await fs.mkdir(`tmp`)
   }
-
-  // search starts upwards
-  let direction = 1
   
+  let direction = 1 // search starts upwards
   if (options.searchDirection) {
     direction = options.searchDirection
+  }
+  let video1SearchLength = 300 * 1000
+  if (options.searchLengthInSeconds) {
+    video1SearchLength = options.searchLengthInSeconds * 1000
+  }
+  let searchIncrementSize = 2500 // maximum search area to find the next scene before switching sides
+  if (options.searchIncrementSizeInSeconds) {
+    searchIncrementSize = options.searchIncrementSizeInSeconds * 1000
   }
   
   let video1Data = await ffprobe(video1)
@@ -223,6 +228,7 @@ async function calculateOffset(video1, video2, options) {
   
   // make sure to stay within offset bounds
   // continue while at least one side still within the bounds
+  //FIXME makes sure that a direction is blocked as soon as the max search offset is surpassed
   while (
     currentSearchOffsets.upper < video2Duration &&
     currentSearchOffsets.lower > 0 &&
@@ -288,7 +294,7 @@ async function calculateOffset(video1, video2, options) {
         videoOffset: video1SceneChange.preSceneChangeFrame.offset - sceneComparison.video2SceneChange.preSceneChangeFrame.offset,
         confidence: 1,
       }
-      spinner.succeed(`Source video is approx. ${Math.abs(result.videoOffset)} ms ${result.videoOffset > 0 ? `ahead` : `behind`} destination video. Took ${ms(Date.now() - startTime)}`)
+      spinner.succeed(`Source video is approx. ${Math.abs(result.videoOffset)} ms ${result.videoOffset > 0 ? `ahead of` : `behind`} the destination video. Took ${ms(Date.now() - startTime)}`)
       return result
       
     } else {
@@ -324,7 +330,7 @@ async function calculateOffset(video1, video2, options) {
     force: true,
   })
   
-  throw new Error(`Couldn't sync videos! (tried for ${ms(Date.now() - startTime)}`)
+  throw new Error(`Couldn't sync videos! (tried for ${ms(Date.now() - startTime)})`)
   
 }
 module.exports.calculateOffset = calculateOffset

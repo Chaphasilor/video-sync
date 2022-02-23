@@ -73,7 +73,7 @@ module.exports.calcOffset = async function(video1Path, video2Path, options = {
   // const rollingFrameOffset = parseInt(video1IsLarger ? offset2 : offset1)
 
   // generate the static frame using the video length and a padding of 1%
-  console.log(`videoInfo.lengths:`, videoInfo.lengths)
+  console.debug(`videoInfo:`, videoInfo)
   let staticLength = videoInfo.lengths[video1IsLarger ? 0 : 1]
   let staticFrameOffset = Math.round(staticLength/2)
   console.log(`staticFrameOffset:`, staticFrameOffset)
@@ -108,7 +108,7 @@ module.exports.calcOffset = async function(video1Path, video2Path, options = {
     
     console.log(`iteration:`, iteration)
 
-    let searchWidth = options.searchWidth / iteration
+    let searchWidth = options.maxOffset*2 / iteration
     
     console.log(`searchWidth:`, searchWidth)
     console.log(`searchCenter:`, searchCenter)
@@ -174,10 +174,10 @@ module.exports.calcOffset = async function(video1Path, video2Path, options = {
   console.log(`searchCenter:`, searchCenter)
   
   let totalOffset = (staticFrameOffset - searchCenter).toFixed(0)
-  console.log(`Video 2 is approx. ${Math.abs(totalOffset)} ms ${video1IsLarger && totalOffset > 0 ? `ahead` : `behind`} video 1 (${closestMatch.value})`)
+  console.log(`Video 2 is approx. ${Math.abs(totalOffset)} ms ${video1IsLarger && totalOffset > 0 ? `ahead of` : `behind`} video 1 (${closestMatch.value})`)
 
   // cli.action.stop(`Done! Source video is approx. ${Math.abs(totalOffset)} ms ${video1IsLarger && totalOffset > 0 ? `ahead` : `behind`} destination video (confidence ${closestMatch.value.toFixed(5)}).`)
-  spinner.succeed(`Source video is approx. ${Math.abs(totalOffset)} ms ${video1IsLarger && totalOffset > 0 ? `ahead` : `behind`} destination video (confidence ${closestMatch.value.toFixed(5)}).`)
+  spinner.succeed(`Source video is approx. ${Math.abs(totalOffset)} ms ${video1IsLarger && totalOffset > 0 ? `ahead of` : `behind`} destination video (confidence ${closestMatch.value.toFixed(5)}).`)
   
   return {
     videoOffset: totalOffset,
@@ -192,11 +192,20 @@ async function getVideoInfo(vid1, vid2) {
   let vid2Data = await probe(vid2)
   console.log(`vid1Data:`, vid1Data)
   console.log(`vid2Data:`, vid2Data)
+  const vid1VideoStreamIndex = vid1Data.streams.findIndex(x => x.codec_type === `video`)
+  const vid2VideoStreamIndex = vid2Data.streams.findIndex(x => x.codec_type === `video`)
 
-  console.debug(`Video 1: width: ${vid1Data.streams[0].width}, height: ${vid1Data.streams[0].height}`)
-  console.debug(`Video 2: width: ${vid2Data.streams[0].width}, height: ${vid2Data.streams[0].height}`)
+  if (vid1VideoStreamIndex < 0) {
+    throw new Error(`No video stream found in '${vid1}'`)
+  }
+  if (vid2VideoStreamIndex < 0) {
+    throw new Error(`No video stream found in '${vid2}'`)
+  }
 
-  if (vid1Data.streams[0].width > vid2Data.streams[0].width && vid1Data.streams[0].height < vid2Data.streams[0].height) {
+  console.debug(`Video 1: width: ${vid1Data.streams[vid1VideoStreamIndex].width}, height: ${vid1Data.streams[vid1VideoStreamIndex].height}`)
+  console.debug(`Video 2: width: ${vid2Data.streams[vid2VideoStreamIndex].width}, height: ${vid2Data.streams[vid2VideoStreamIndex].height}`)
+
+  if (vid1Data.streams[0].width > vid2Data.streams[vid2VideoStreamIndex].width && vid1Data.streams[0].height < vid2Data.streams[vid2VideoStreamIndex].height) {
     console.warn(`Videos have different aspect ratios. You might get worse results.`)
   }
 
@@ -207,12 +216,12 @@ async function getVideoInfo(vid1, vid2) {
     ],
     dimensions: [
       {
-        width: vid1Data.streams[0].width,
-        height: vid1Data.streams[0].height,
+        width: vid1Data.streams[vid1VideoStreamIndex].width,
+        height: vid1Data.streams[vid1VideoStreamIndex].height,
       },
       {
-        width: vid2Data.streams[0].width,
-        height: vid2Data.streams[0].height,
+        width: vid2Data.streams[vid2VideoStreamIndex].width,
+        height: vid2Data.streams[vid2VideoStreamIndex].height,
       },
     ],
   }
