@@ -78,8 +78,17 @@ class VideoSyncCommand extends Command {
       }
 
     }
+
+    console.debug(`answers.source:`, answers.source)
+    console.debug(`answers.destination:`, answers.destination)
     
     let availableTracks = tracks.getTrackInfo(answers.source)
+
+    //TODO compare video duration and print warning/prompt if they are too different
+    // let video1Data = await ffprobe(video1)
+    // let video2Data = await ffprobe(video2)
+    // let video1Duration = Number(video1Data.format.duration) * 1000 // offset in ms
+    // let video2Duration = Number(video2Data.format.duration) * 1000 // offset in ms
     
     let selectedTracks
     
@@ -220,7 +229,6 @@ class VideoSyncCommand extends Command {
         result = await calcOffset(answers.destination, answers.source, {
           comparisonAlgorithm: ALGORITHMS.SSIM,
           iterations: flags.iterations,
-          searchWidth: flags.searchWidth,
           searchResolution: flags.searchResolution,
           maxOffset: flags.maxOffset,
           offsetEstimate: flags.offsetEstimate,
@@ -230,6 +238,8 @@ class VideoSyncCommand extends Command {
         result = await calculateOffset(answers.destination, answers.source, {
           maxOffset: flags.maxOffset * 1000,
           offsetEstimate: flags.offsetEstimate,
+          searchLengthInSeconds: flags.sceneSearchDuration,
+          searchIncrementSizeInSeconds: flags.searchIncrements,
         })
       }
 
@@ -287,10 +297,10 @@ class VideoSyncCommand extends Command {
 }
 
 VideoSyncCommand.description = `video-sync - a tool for automating the process of muxing additional audio tracks into videos
-This tool requires the two input videos, the one where you want to add the additional tracks *to* (the destination video) and the one where you take the additional tracks *from* (the source video).
+This tool requires two input videos, one where you want to add the additional tracks *to* (the destination video) and one where you take the additional tracks *from* (the source video).
 It then tries to find the exact same frame in both videos, in order to synchronize them (in case one of them is longer or shorter than the other).
 It allows you to pick the audio and subtitle tracks you want to add to the destination and specify the output file.
-There's an interactive mode (simply don't pass any arguments, flags work) and a CLI mode (pass the two arguments listed at the top).
+There's an interactive mode (simply don't pass any arguments, flags are fine) and a CLI mode (pass the two arguments listed at the top).
 `
 
 VideoSyncCommand.args = [
@@ -314,12 +324,6 @@ VideoSyncCommand.flags = {
     description: `output file path`,
     required: false, // if omitted, only the offset is printed
   }),
-  confirm: flags.boolean({
-    char: `y`,
-    description: `automatically confirm missing tracks, low confidence scores, warped videos and overwrite prompts`,
-    required: false, // if omitted, only the offset is printed
-    default: false,
-  }),
   audioTracks: flags.string({
     char: `a`,
     multiple: true, // important to allow spaces in-between
@@ -340,21 +344,6 @@ VideoSyncCommand.flags = {
     options: [`simple`, `matching-scene`],
     default: `matching-scene`,
   }),
-  iterations: flags.integer({
-    char: `i`,
-    description: `number of iterations to perform for video syncing (requires algorithm=simple)`,
-    default: 2,
-  }),
-  searchWidth: flags.integer({
-    char: `w`,
-    description: `width of the search region (in seconds) for video syncing. the program will find the closest matching frame in this region, 'sourceOffset' being the center (requires algorithm=simple)`,
-    default: 20,
-  }),
-  maxOffset: flags.integer({
-    char: `m`,
-    description: `maximum considered offset between the videos (in seconds) for video syncing.`,
-    default: 120,
-  }),
   offsetEstimate: flags.integer({
     char: `e`,
     description: `estimated offset between the two videos (in ms) for video syncing. positive values means that the source video is ahead of the destination video`,
@@ -365,11 +354,29 @@ VideoSyncCommand.flags = {
     description: `use the estimated offset as the final offset, no synching`,
     default: false,
   }),
+  maxOffset: flags.integer({
+    char: `m`,
+    description: `maximum considered offset between the videos (in seconds) for video syncing.`,
+    default: 120,
+  }),
+  searchIncrements: flags.integer({
+    description: `maximum area (video duration, in seconds) to search for the next scene in any direction (forward/backward) before searching in the other direction (requires algorithm=matching-scene)`,
+    default: 3,
+  }),
+  sceneSearchDuration: flags.integer({
+    description: `maximum area (video duration, in seconds) to search for any "abrupt" scene change in the destination video before aborting (requires algorithm=matching-scene)`,
+    default: 300,
+  }),
   exclusiveDirection: flags.string({
     char: `x`,
     description: `only search the matching frame offset in one direction. 'ahead' means that the source video scene comes *before* the destination video scene. (requires algorithm=matching-scene)`,
     parse: (input) => input ? (input === `ahead` ? -1 : 1) : false,
     default: undefined,
+  }),
+  iterations: flags.integer({
+    char: `i`,
+    description: `number of iterations to perform for video syncing (requires algorithm=simple)`,
+    default: 2,
   }),
   threshold: flags.string({
     char: `t`,
@@ -381,6 +388,12 @@ VideoSyncCommand.flags = {
     char: `r`,
     description: `resolution of the search region (in frames) for video syncing. increases accuracy at the cost of longer runtime (requires algorithm=simple)`,
     default: 80,
+  }),
+  confirm: flags.boolean({
+    char: `y`,
+    description: `automatically confirm missing tracks, low confidence scores, warped videos and overwrite prompts`,
+    required: false, // if omitted, only the offset is printed
+    default: false,
   }),
   verbose: flags.boolean({
     char: `v`,

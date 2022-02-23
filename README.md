@@ -14,7 +14,7 @@ This tool requires the two input videos, the one where you want to add the addit
 It then tries to find the exact same frame in both videos, in order to synchronize them (in case one of them is longer or shorter than the other).  
 It allows you to pick the audio and subtitle tracks you want to add to the destination and specify the output file.
 
-There's an interactive mode (simply don't pass any arguments, flags work) and a CLI mode (pass the two arguments listed at the top).
+There's an interactive mode (simply don't pass any arguments, flags are fine) and a CLI mode (pass the two arguments listed at the top).
 
 ## Examples
 
@@ -44,20 +44,21 @@ $ video-sync -h # help page
 
 - `-s, --subsTracks=<list>` subtitle tracks to sync over to the destination video. comma-separated list of mkvmerge IDs or ISO 639-2 language tags (track matching that language will be synced). if omitted, all subtitle tracks will be synced
 
+- `-g, --algorithm=<simple|matching-scene>` [default: matching-scene] search algorithm to use for video syncing
+
 - `-e, --offsetEstimate=<number>` estimated offset between the two videos (in ms) for video syncing. positive values means that the source video is ahead of the destination video
 
 - `-f, --forceOffset` use the estimated offset as the final offset, no synching
 
-- `-x, --exclusiveDirection=<ahead|behind>` only search the matching frame offset in one direction. 'ahead' means that the source video scene comes *before* the destination video scene. (requires algorithm=matching-scene)
-
-- `-g, --algorithm=<simple|matching-scene>` [default: matching-scene] search algorithm to use for video syncing
-
 - `-m, --maxOffset=<number>` [default: 120] maximum considered offset between the videos (in seconds) for video syncing.
 
-- `-r, --searchResolution=<number>` [default: 80] resolution of the search region (in frames) for video syncing. increases accuracy at the cost of longer runtime (requires algorithm=simple)
+- `--searchIncrements=<number>` [default: 3] maximum area (video duration, in seconds) to search for the next scene in any direction (forward/backward) before searching in the other direction (requires algorithm=matching-scene)
+- `--sceneSearchDuration=<number>` [default: 300] maximum area (video duration, in seconds) to search for any "abrupt" scene change in the destination video before aborting (requires algorithm=matching-scene)
+- `-x, --exclusiveDirection=<ahead|behind>` only search the matching frame offset in one direction. 'ahead' means that the source video scene comes *before* the destination video scene. (requires algorithm=matching-scene)
+
 - `-i, --iterations=<number>` [default: 2] number of iterations to perform for video syncing (requires algorithm=simple)
 - `-t, --threshold=<number>` [default: 0.6] minimum confidence threshold for video syncing. (requires algorithm=simple)
-- `-w, --searchWidth=<number>` [default: 20] width of the search region (in seconds) for video syncing. the program will find the closest matching frame in this region, 'sourceOffset' being the center (requires algorithm=simple)
+- `-r, --searchResolution=<number>` [default: 80] resolution of the search region (in frames) for video syncing. increases accuracy at the cost of longer runtime (requires algorithm=simple)
 
 - `-y, --confirm` automatically confirm missing tracks, low confidence scores, warped videos and overwrite prompts
 

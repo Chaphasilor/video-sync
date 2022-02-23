@@ -236,7 +236,7 @@ function getTrackInfo(video) {
         channels: track.properties[`audio_channels`],
         ids: {
           mkvmerge: track.id,
-        }
+        },
       }
     }),
     subs: subsTracks.map(track => {
@@ -246,7 +246,7 @@ function getTrackInfo(video) {
         codec: track.codec,
         ids: {
           mkvmerge: track.id,
-        }
+        },
       }
     })
   } 
