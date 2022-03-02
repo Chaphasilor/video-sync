@@ -249,11 +249,13 @@ class VideoSyncCommand extends Command {
 
     // check if one of the videos is warped
     let videoWarped = false
-    const offsetValidationSpinner = ora(`Checking if found offset applies to the whole video...`).start();
-    try {
-      videoWarped = ! await validateOffset(args.destination, args.source, videoOffset)
-    } catch (err) {
-      console.error(`Error while checking if found offset applies to the whole video:`, err)
+    if (!flags.noOffsetValidation) {
+      const offsetValidationSpinner = ora(`Checking if found offset applies to the whole video...`).start();
+      try {
+        videoWarped = ! await validateOffset(args.destination, args.source, videoOffset)
+      } catch (err) {
+        console.error(`Error while checking if found offset applies to the whole video:`, err)
+      }
     }
 
     // log warning about warped video
@@ -352,6 +354,11 @@ VideoSyncCommand.flags = {
   forceOffset: flags.boolean({
     char: `f`,
     description: `use the estimated offset as the final offset, no synching`,
+    default: false,
+  }),
+  noOffsetValidation: flags.boolean({
+    char: `n`,
+    description: `don't check if one of the videos is warped (which could invalidate the offset)`,
     default: false,
   }),
   maxOffset: flags.integer({
