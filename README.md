@@ -50,6 +50,8 @@ $ video-sync -h # help page
 
 - `-f, --forceOffset` use the estimated offset as the final offset, no synching
 
+- `-n, --noOffsetValidation` don't check if one of the videos is warped (which could invalidate the offset)
+
 - `-m, --maxOffset=<number>` [default: 120] maximum considered offset between the videos (in seconds) for video syncing.
 
 - `--searchIncrements=<number>` [default: 3] maximum area (video duration, in seconds) to search for the next scene in any direction (forward/backward) before searching in the other direction (requires algorithm=matching-scene)
