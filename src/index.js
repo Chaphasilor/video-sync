@@ -250,21 +250,23 @@ class VideoSyncCommand extends Command {
     // check if one of the videos is warped
     let videoWarped = false
     if (!flags.noOffsetValidation) {
+
       const offsetValidationSpinner = ora(`Checking if found offset applies to the whole video...`).start();
       try {
         videoWarped = ! await validateOffset(args.destination, args.source, videoOffset)
       } catch (err) {
         console.error(`Error while checking if found offset applies to the whole video:`, err)
       }
-    }
 
-    // log warning about warped video
-    if (videoWarped && flags.confirm) {
-      offsetValidationSpinner.warn(`Syncing the tracks might not work well because one of the videos appears to be warped.`)
-    } else if (!videoWarped) {
-      offsetValidationSpinner.succeed(`Offset is valid.`)
-    } else {
-      offsetValidationSpinner.stop()
+      // log warning about warped video
+      if (videoWarped && flags.confirm) {
+        offsetValidationSpinner.warn(`Syncing the tracks might not work well because one of the videos appears to be warped.`)
+      } else if (!videoWarped) {
+        offsetValidationSpinner.succeed(`Offset is valid.`)
+      } else {
+        offsetValidationSpinner.stop()
+      }
+
     }
     
     let continueWithMerging = answers.output !== undefined && (selectedTracks.audio.length > 0 || selectedTracks.subs.length > 0)
